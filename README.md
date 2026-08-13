@@ -78,8 +78,8 @@ between rehearsal and stage is a lost hackathon.
 | Phase | Component | State |
 |---|---|---|
 | 0 | Repo scaffold, config, health route, frontend shell | ✅ done |
-| 1 | Transaction simulator + ground-truth labels | ⬜ next |
-| 2 | Graph store, feature engineering, DuckDB | ⬜ |
+| 1 | Transaction simulator + ground-truth labels | ✅ done |
+| 2 | Graph store, feature engineering, DuckDB | ⬜ next |
 | 3 | Detection: rules → LightGBM → GNN, ring clustering | ⬜ |
 | 4 | **Freeze-frontier interdiction solver** | ⬜ |
 | 5 | Operations console, flow canvas, replay | ⬜ |

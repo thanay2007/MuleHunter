@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     )
 
     # ---------------------------------------------------------------- service
-    version: str = "0.1.0"
-    phase: int = 0
+    version: str = "0.2.0"
+    phase: int = 1
     service_name: str = "chakravyuh"
     host: str = "127.0.0.1"
     port: int = 8000
@@ -82,8 +82,31 @@ class Settings(BaseSettings):
     target_transactions: int = 250_000
 
     # Simulation window. Transactions are generated across this many days of
-    # background activity; incidents are injected into the final day.
+    # background activity; scenario incidents are injected into the final day.
+    # The window is anchored to a fixed end date so the dataset never depends
+    # on the wall clock -- that would break byte-identical regeneration.
     sim_days: int = 30
+    sim_end_date: str = "2026-08-10"
+
+    # Background traffic is generated from the per-archetype rates below, then
+    # scaled by a single global factor so the total lands on
+    # `target_transactions`. The rates therefore set the *relative* activity of
+    # each archetype (which is what detection depends on); the target sets the
+    # absolute dataset size. See simulator/README.md.
+    #
+    # Most transfers go to a small set of repeat counterparties rather than to
+    # a uniformly random account. This is what gives the graph real community
+    # structure for Louvain to find, and makes recipient-set overlap a
+    # meaningful signal.
+    n_regular_counterparties: int = 8
+    regular_counterparty_prob: float = 0.72
+    same_district_prob: float = 0.55  # locality bias when picking counterparties
+
+    # Salary credits come from a small pool of employer accounts, creating the
+    # hub structure a real retail banking graph has.
+    n_employers: int = 220
+    salary_lognormal: tuple[float, float] = (10.4, 0.55)
+    salary_days_of_month: tuple[int, ...] = (1, 2, 3)
 
     # Archetype shares. Must sum to 1.0 (asserted at generation time).
     # `legit_high_velocity` is the hard-negative class: chit fund operators,
@@ -138,9 +161,48 @@ class Settings(BaseSettings):
 
     salary_day_multiplier: float = 3.2  # 1st-3rd of month
     festival_day_multiplier: float = 2.1
+    festival_dates: list[str] = Field(
+        default_factory=lambda: ["2026-07-26", "2026-08-08"]
+    )
+
+    # Channel mix for background traffic. ATM withdrawal is deliberately a
+    # normal thing legitimate people do -- if only mules used ATMs, cash-out
+    # proximity would trivially solve the detection problem and the benchmark
+    # would be meaningless.
+    channel_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "UPI": 0.62,
+            "IMPS": 0.14,
+            "NEFT": 0.11,
+            "CARD": 0.07,
+            "ATM_WITHDRAWAL": 0.06,
+        }
+    )
+
+    # Fraction of the legitimate population that shares a device with someone
+    # else (families, shared handsets, cyber cafes). Same reasoning as above:
+    # device sharing must be noisy or the shared-infrastructure feature becomes
+    # a giveaway rather than a signal.
+    legit_device_pool_ratio: float = 0.90
 
     # ------------------------------------------- phase 1: mule ring injection
     n_rings: int = 12  # 3 of each of the 4 typologies
+
+    # Accounts per ring. Real syndicate rings reported by I4C run from a few
+    # dozen to a few hundred accounts; a tree with unbounded fan-out and depth
+    # would explode past that, so growth is capped by this budget.
+    ring_size_range: tuple[int, int] = (28, 120)
+
+    # Each ring launders money several times across the window. One episode per
+    # scenario is pinned to the exact amount and time the scenario specifies;
+    # the rest are randomised to give the detectors varied training data.
+    ring_episodes_range: tuple[int, int] = (2, 4)
+
+    # Exit infrastructure: where money leaves the banking system. These are
+    # graph nodes, not retail accounts, and sit outside `n_accounts`.
+    n_atm_exits: int = 40
+    n_exchange_exits: int = 6
+    n_crossborder_exits: int = 4
 
     # Fan-out layering
     fanout_splits: tuple[int, int] = (6, 14)      # splits per layer
