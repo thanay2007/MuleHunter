@@ -1,0 +1,70 @@
+/* Fonts are installed via npm (@fontsource/*) so the app works fully offline.
+   No CDN, no network call at runtime. */
+@import '@fontsource/archivo/600.css';
+@import '@fontsource/inter-tight/400.css';
+@import '@fontsource/inter-tight/500.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink text-hi font-sans antialiased;
+  }
+
+  /* Money must never reflow or jitter as it counts. */
+  .font-mono,
+  code,
+  kbd {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* Keyboard focus is visible on every control -- quality floor, not optional. */
+  :focus-visible {
+    outline: 1px solid theme('colors.hi');
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* A panel in the dark chrome: hairline border, 1px, never 2px. */
+  .panel {
+    @apply bg-ink-raised border border-ink-line rounded-panel;
+  }
+
+  /* A ledger inset: warm passbook paper with ruled lines. Only money goes here. */
+  .ledger {
+    @apply bg-paper text-paper-text rounded-panel;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 27px,
+      theme('colors.paper.line') 27px,
+      theme('colors.paper.line') 28px
+    );
+  }
+
+  .label-lo {
+    @apply text-lo text-[11px] tracking-wide;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

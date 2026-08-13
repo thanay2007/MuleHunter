@@ -1,0 +1,45 @@
+# Chakravyuh backend dependencies.
+#
+# Install into your conda env:
+#     conda create -n chakravyuh python=3.11 -y
+#     conda activate chakravyuh
+#     pip install -r requirements.txt
+#
+# Everything here is pip-installable, offline-capable after install, and free.
+# No Docker, no cloud, no API keys.
+
+# --- web -------------------------------------------------------------------
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.32,<1.0
+pydantic>=2.9,<3.0
+pydantic-settings>=2.6,<3.0
+websockets>=13.0
+
+# --- data ------------------------------------------------------------------
+polars>=1.12
+pyarrow>=17.0
+duckdb>=1.1
+numpy>=1.26,<3.0
+
+# --- graph -----------------------------------------------------------------
+networkx>=3.3
+python-louvain>=0.16
+
+# --- models ----------------------------------------------------------------
+lightgbm>=4.5
+scikit-learn>=1.5
+shap>=0.46
+
+# --- optimisation ----------------------------------------------------------
+ortools>=9.11
+
+# --- test ------------------------------------------------------------------
+pytest>=8.3
+httpx>=0.27          # required by fastapi.testclient
+
+# --- optional: GNN ---------------------------------------------------------
+# PyTorch and PyTorch Geometric are imported defensively; the system runs
+# fully without them (LightGBM is the fallback detector). Install separately
+# if you want the GNN tier -- PyG wheels are platform-specific:
+#     pip install torch --index-url https://download.pytorch.org/whl/cpu
+#     pip install torch-geometric
