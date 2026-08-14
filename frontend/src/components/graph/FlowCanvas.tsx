@@ -241,7 +241,7 @@ export default function FlowCanvas({
       }
 
       if (raw.kind === 'victim' && scale > 0.4) {
-        ctx.font = `500 ${11 / scale}px "IBM Plex Mono", monospace`
+        ctx.font = `500 ${13 / scale}px "IBM Plex Mono", monospace`
         ctx.fillStyle = tokens.textHi
         ctx.textAlign = 'center'
         ctx.fillText('victim', x, y - radius - 8 / scale)
@@ -255,7 +255,7 @@ export default function FlowCanvas({
     (ctx: CanvasRenderingContext2D, scale: number) => {
       if (scale < 0.22) return
       ctx.textAlign = 'center'
-      ctx.font = `500 ${10 / scale}px "IBM Plex Mono", monospace`
+      ctx.font = `500 ${12 / scale}px "IBM Plex Mono", monospace`
 
       for (const depth of columns) {
         ctx.fillStyle = tokens.textLo

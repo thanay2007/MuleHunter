@@ -16,20 +16,20 @@ export default function RingCard({ ring }: { ring: DiscoveredRing }) {
   return (
     <article className="panel p-4 flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <span className="font-mono text-[13px] text-hi">{ring.ring_id}</span>
-        <span className="text-[11px] text-lo">
+        <span className="font-mono text-[15.5px] text-hi">{ring.ring_id}</span>
+        <span className="text-[13px] text-lo">
           confidence {percent(ring.confidence, 0)}
         </span>
       </div>
 
       <div className="flex items-baseline gap-1.5">
-        <span className="font-mono text-[24px] text-flow leading-none tabular-nums">
+        <span className="font-mono text-[25px] text-flow leading-none tabular-nums">
           {rupeesCompact(ring.total_flow_inr)}
         </span>
-        <span className="text-[11px] text-lo">moved</span>
+        <span className="text-[13px] text-lo">moved</span>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
         {[
           ['Accounts', count(ring.accounts)],
           ['Banks', String(ring.banks.length)],
@@ -46,7 +46,7 @@ export default function RingCard({ ring }: { ring: DiscoveredRing }) {
       </dl>
 
       {ring.cashout_capacity_inr > 0 && (
-        <div className="flex justify-between text-[12px]">
+        <div className="flex justify-between text-[14px]">
           <span className="text-lo">Reached cash-out</span>
           <span className="font-mono text-burn tabular-nums">
             {rupeesCompact(ring.cashout_capacity_inr)}
@@ -54,7 +54,7 @@ export default function RingCard({ ring }: { ring: DiscoveredRing }) {
         </div>
       )}
 
-      <p className="text-[11.5px] text-lo leading-relaxed pt-2 border-t border-ink-line">
+      <p className="text-[13.5px] text-lo leading-relaxed pt-2 border-t border-ink-line">
         {shared ? (
           <>
             {ring.accounts} accounts across {ring.banks.length}{' '}
@@ -75,7 +75,7 @@ export default function RingCard({ ring }: { ring: DiscoveredRing }) {
         {ring.banks.map((bank) => (
           <span
             key={bank}
-            className="font-mono text-[10px] text-lo border border-ink-line rounded-panel px-1.5 py-0.5"
+            className="font-mono text-[12px] text-lo border border-ink-line rounded-panel px-1.5 py-0.5"
           >
             {bank}
           </span>

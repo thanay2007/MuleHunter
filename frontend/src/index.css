@@ -1,8 +1,15 @@
 /* Fonts are installed via npm (@fontsource/*) so the app works fully offline.
-   No CDN, no network call at runtime. */
-@import '@fontsource/archivo/600.css';
-@import '@fontsource/inter-tight/400.css';
-@import '@fontsource/inter-tight/500.css';
+   No CDN, no network call at runtime.
+
+   One family, two widths: IBM Plex Sans for everything that is words, IBM Plex
+   Mono for everything that is a figure. They were drawn as a system, so the
+   sans and the mono share proportions and the console reads as one surface
+   rather than three unrelated faces. Plex Sans is also a warmer, more humanist
+   shape than the previous Inter Tight, which matters because most of this
+   interface is small text. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
 
@@ -29,6 +36,12 @@
     font-feature-settings: 'tnum' 1;
   }
 
+  /* `font-display` sets the family only, so carry the weight with it -- every
+     section header in the product uses this class and expects semibold. */
+  .font-display {
+    font-weight: 600;
+  }
+
   /* Keyboard focus is visible on every control -- quality floor, not optional. */
   :focus-visible {
     outline: 1px solid theme('colors.hi');
@@ -53,7 +66,7 @@
   }
 
   .label-lo {
-    @apply text-lo text-[11px] tracking-wide;
+    @apply text-lo text-[13px] tracking-wide;
   }
 }
 

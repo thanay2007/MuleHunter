@@ -53,17 +53,17 @@ function Column({
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-3 mb-3.5">
-        <h3 className="font-display text-[13px] text-paper-text tracking-display">
+        <h3 className="font-display text-[15.5px] text-paper-text tracking-display">
           {title}
         </h3>
-        <span className="text-[10px] text-paper-text/45 tracking-wide">{subtitle}</span>
+        <span className="text-[12px] text-paper-text/45 tracking-wide">{subtitle}</span>
       </div>
 
       <RecoveryCounter
         value={saved}
-        className="text-[32px] leading-none block text-interdict"
+        className="text-[33.5px] leading-none block text-interdict"
       />
-      <div className="text-[11px] text-paper-text/55 mt-2">
+      <div className="text-[13px] text-paper-text/55 mt-2">
         kept inside the banking system
       </div>
 
@@ -82,16 +82,16 @@ function Column({
       </div>
 
       <div className="mt-3 flex items-baseline justify-between gap-3">
-        <span className="font-mono tabular-nums text-[15px] text-burn leading-none">
+        <span className="font-mono tabular-nums text-[17.5px] text-burn leading-none">
           {rupees(leaked)}
         </span>
-        <span className="text-[11px] text-paper-text/55">
+        <span className="text-[13px] text-paper-text/55">
           gone — {percent(lostShare, 0)} of the theft
         </span>
       </div>
 
       <div
-        className="mt-3.5 pt-3 flex items-baseline justify-between gap-3 text-[11px] text-paper-text/60"
+        className="mt-3.5 pt-3 flex items-baseline justify-between gap-3 text-[13px] text-paper-text/60"
         style={{ borderTop: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
         <span>
@@ -100,7 +100,7 @@ function Column({
         </span>
         <span>
           <span
-            className={`font-mono tabular-nums text-[13px] ${
+            className={`font-mono tabular-nums text-[15.5px] ${
               innocent > 0 ? 'text-burn' : 'text-paper-text'
             }`}
           >
@@ -123,7 +123,7 @@ export default function SplitCompare({
   if (!frame || !header) {
     return (
       <div className="ledger px-6 py-9 text-center">
-        <p className="text-[13px] text-paper-text/55">
+        <p className="text-[15.5px] text-paper-text/55">
           Run the interdiction to compare current practice against Chakravyuh.
         </p>
       </div>
@@ -147,10 +147,10 @@ export default function SplitCompare({
         className="flex items-baseline justify-between gap-4 pb-3.5 mb-5"
         style={{ borderBottom: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
-        <h2 className="font-display text-[14px] text-paper-text tracking-display">
+        <h2 className="font-display text-[16.5px] text-paper-text tracking-display">
           Incident ledger
         </h2>
-        <span className="text-[10.5px] text-paper-text/50">
+        <span className="text-[12.5px] text-paper-text/50">
           <span className="font-mono tabular-nums text-paper-text/70">
             {rupees(amountInr)}
           </span>{' '}
@@ -196,7 +196,7 @@ export default function SplitCompare({
         style={{ borderTop: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
         {!anythingLost ? (
-          <p className="text-[12.5px] text-paper-text/70 leading-relaxed">
+          <p className="text-[15px] text-paper-text/70 leading-relaxed">
             Nothing has left the banking system yet — every rupee is still
             recoverable on both sides.
           </p>
@@ -207,15 +207,15 @@ export default function SplitCompare({
                 className="shrink-0 px-4 py-2.5 text-center rounded-[2px]"
                 style={{ border: '1px solid rgba(47, 191, 184, 0.45)' }}
               >
-                <div className="font-mono tabular-nums text-[32px] leading-none text-interdict">
+                <div className="font-mono tabular-nums text-[33.5px] leading-none text-interdict">
                   {multiple.toFixed(1)}×
                 </div>
-                <div className="text-[9.5px] text-paper-text/50 mt-1.5 tracking-wide">
+                <div className="text-[11px] text-paper-text/50 mt-1.5 tracking-wide">
                   more money kept
                 </div>
               </div>
             )}
-            <p className="text-[12.5px] text-paper-text/75 leading-relaxed">
+            <p className="text-[15px] text-paper-text/75 leading-relaxed">
               <span className="font-mono tabular-nums text-paper-text">
                 {rupees(gap)}
               </span>{' '}
@@ -249,7 +249,7 @@ export default function SplitCompare({
             </p>
           </>
         ) : (
-          <p className="text-[12.5px] text-paper-text/70 leading-relaxed">
+          <p className="text-[15px] text-paper-text/70 leading-relaxed">
             No advantage on this incident — the money was already gone before anyone
             could act.
           </p>

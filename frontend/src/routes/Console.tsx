@@ -32,7 +32,7 @@ function Legend() {
       {items.map((item) => (
         <span
           key={item.label}
-          className="flex items-center gap-1.5 text-[11px] text-lo"
+          className="flex items-center gap-1.5 text-[13px] text-lo"
         >
           <span
             className="inline-block w-2 h-2 rounded-full"
@@ -56,8 +56,8 @@ function DatasetMissing({ message }: { message: string }) {
             No dataset to load
           </h2>
         </div>
-        <p className="text-[13px] text-lo mb-3 leading-relaxed">{message}</p>
-        <pre className="font-mono text-[12px] text-hi bg-ink p-3 rounded-panel border border-ink-line whitespace-pre-wrap">
+        <p className="text-[15.5px] text-lo mb-3 leading-relaxed">{message}</p>
+        <pre className="font-mono text-[14px] text-hi bg-ink p-3 rounded-panel border border-ink-line whitespace-pre-wrap">
           cd backend{'\n'}
           python -m app.simulator.generator{'\n'}
           python -m app.detect.train
@@ -175,7 +175,7 @@ export default function Console() {
               onSelect={setScenario}
             />
           ) : (
-            <p className="text-[12px] text-lo">Loading incidents…</p>
+            <p className="text-[14px] text-lo">Loading incidents…</p>
           )}
         </div>
 
@@ -190,7 +190,7 @@ export default function Console() {
             onClick={run}
             disabled={!scenarioId || busy}
             className={[
-              'w-full py-2 rounded-panel border text-[13px] flex items-center justify-center gap-2 transition-colors',
+              'w-full py-2 rounded-panel border text-[15.5px] flex items-center justify-center gap-2 transition-colors',
               busy
                 ? 'border-ink-line text-lo cursor-wait'
                 : 'border-hi/40 text-hi hover:bg-ink-raised',
@@ -215,7 +215,7 @@ export default function Console() {
           </button>
 
           {interdiction.error && (
-            <p className="text-[11px] text-lo mt-2 leading-relaxed">
+            <p className="text-[13px] text-lo mt-2 leading-relaxed">
               {(interdiction.error as Error).message}
             </p>
           )}
@@ -241,7 +241,7 @@ export default function Console() {
                   )}`,
                 ],
               ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-2 text-[11px]">
+                <div key={label} className="flex justify-between gap-2 text-[13px]">
                   <dt className="text-lo">{label}</dt>
                   <dd className="font-mono text-hi tabular-nums">{value}</dd>
                 </div>
@@ -254,7 +254,7 @@ export default function Console() {
           <div className="flex items-baseline justify-between mb-2 shrink-0">
             <h2 className="label-lo">Freeze queue</h2>
             {plan.length > 0 && (
-              <span className="font-mono text-[11px] text-lo tabular-nums">
+              <span className="font-mono text-[13px] text-lo tabular-nums">
                 {count(plan.filter((s) => s.issue_at_minute <= minute).length)} /{' '}
                 {count(plan.length)}
               </span>
@@ -282,15 +282,15 @@ export default function Console() {
           <div className="flex items-baseline gap-3 min-w-0">
             {scenario ? (
               <>
-                <span className="font-mono text-[12px] text-lo">
+                <span className="font-mono text-[14px] text-lo">
                   {scenario.scenario_id}
                 </span>
-                <span className="text-[13px] text-hi truncate">
+                <span className="text-[15.5px] text-hi truncate">
                   {scenario.name}
                 </span>
               </>
             ) : (
-              <span className="text-[13px] text-lo">Pick a scenario to begin</span>
+              <span className="text-[15.5px] text-lo">Pick a scenario to begin</span>
             )}
           </div>
 
@@ -298,7 +298,7 @@ export default function Console() {
               them here just crowds the bar. */}
           {scenario && (
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[11px] text-lo">
+              <span className="text-[13px] text-lo">
                 <span className="font-mono tabular-nums text-hi">
                   {rupees(scenario.amount_inr)}
                 </span>{' '}
@@ -306,7 +306,7 @@ export default function Console() {
               </span>
               <span
                 className={[
-                  'text-[11px] px-2 py-0.5 rounded-panel border',
+                  'text-[13px] px-2 py-0.5 rounded-panel border',
                   reported ? 'text-hi border-hi/40' : 'text-lo border-ink-line',
                 ].join(' ')}
               >
@@ -319,7 +319,7 @@ export default function Console() {
         <div className="flex-1 min-h-0 relative">
           {graphQuery.isPending && scenarioId && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="flex items-center gap-2 text-[13px] text-lo">
+              <span className="flex items-center gap-2 text-[15.5px] text-lo">
                 <Loader2 size={14} className="animate-spin" aria-hidden />
                 Tracing where the money went…
               </span>
@@ -328,7 +328,7 @@ export default function Console() {
 
           {graphQuery.error && (
             <div className="absolute inset-0 flex items-center justify-center p-6">
-              <p className="text-[13px] text-lo max-w-md text-center">
+              <p className="text-[15.5px] text-lo max-w-md text-center">
                 {(graphQuery.error as Error).message}
               </p>
             </div>
@@ -349,7 +349,7 @@ export default function Console() {
 
           {phase === 'idle' && graphQuery.data && (
             <div className="absolute inset-x-0 bottom-16 flex justify-center pointer-events-none">
-              <p className="text-[12px] text-lo bg-ink/85 backdrop-blur-sm px-3 py-1.5 rounded-panel border border-ink-line">
+              <p className="text-[14px] text-lo bg-ink/85 backdrop-blur-sm px-3 py-1.5 rounded-panel border border-ink-line">
                 Press <span className="text-hi">Run interdiction</span> to watch
                 the money move and the freezes land.
               </p>
@@ -398,7 +398,7 @@ export default function Console() {
               }
             />
           ) : (
-            <div className="ledger px-6 py-8 text-center text-[13px] text-paper-text/60">
+            <div className="ledger px-6 py-8 text-center text-[15.5px] text-paper-text/60">
               Pick a scenario to see where its money went.
             </div>
           )}

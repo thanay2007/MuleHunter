@@ -35,10 +35,10 @@ function Slider({
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1">
-        <label htmlFor={id} className="text-[12px] text-hi">
+        <label htmlFor={id} className="text-[14px] text-hi">
           {label}
         </label>
-        <span className="font-mono text-[12px] text-hi tabular-nums">
+        <span className="font-mono text-[14px] text-hi tabular-nums">
           {format(value)}
         </span>
       </div>
@@ -52,7 +52,7 @@ function Slider({
         onChange={(event) => onChange(Number(event.target.value))}
         className="w-full accent-[#8A9AAA] h-1 cursor-pointer"
       />
-      <p className="text-[11px] text-lo mt-1 leading-snug">{hint}</p>
+      <p className="text-[13px] text-lo mt-1 leading-snug">{hint}</p>
     </div>
   )
 }
@@ -96,10 +96,10 @@ export default function BudgetControls() {
           className="mt-0.5 accent-[#8A9AAA]"
         />
         <span>
-          <span className="text-[12px] text-hi block leading-tight">
+          <span className="text-[14px] text-hi block leading-tight">
             Adaptive adversary
           </span>
-          <span className="text-[11px] text-lo leading-snug block mt-0.5">
+          <span className="text-[13px] text-lo leading-snug block mt-0.5">
             Assume the operator reroutes blocked money instead of giving up.
           </span>
         </span>

@@ -26,7 +26,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="h-full flex flex-col bg-ink">
       <header className="shrink-0 flex items-center justify-between h-12 px-5 border-b border-ink-line">
         <div className="flex items-center gap-6">
-          <span className="font-display text-[15px] tracking-display text-hi">
+          <span className="font-display text-[17.5px] tracking-display text-hi">
             chakravyuh
           </span>
 
@@ -38,7 +38,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 end={'end' in tab ? tab.end : false}
                 className={({ isActive }) =>
                   [
-                    'px-2.5 py-1 rounded-panel text-[12.5px] transition-colors',
+                    'px-2.5 py-1 rounded-panel text-[15px] transition-colors',
                     isActive ? 'text-hi bg-ink-raised' : 'text-lo hover:text-hi',
                   ].join(' ')
                 }
@@ -49,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-[11px] text-lo">
+        <div className="flex items-center gap-3 font-mono text-[13px] text-lo">
           {health && <span>phase {health.phase}</span>}
           <span aria-hidden>·</span>
           <span>seed {health?.master_seed ?? '—'}</span>

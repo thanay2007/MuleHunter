@@ -21,15 +21,15 @@ import { tokens } from '@/theme/tokens'
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div className="panel px-4 py-3">
-      <div className="font-mono text-[20px] text-hi leading-none">{value}</div>
-      <div className="text-[11px] text-lo mt-1.5">{label}</div>
+      <div className="font-mono text-[22px] text-hi leading-none">{value}</div>
+      <div className="text-[13px] text-lo mt-1.5">{label}</div>
     </div>
   )
 }
 
 const chartAxis = {
   stroke: tokens.inkLine,
-  tick: { fill: tokens.textLo, fontSize: 11, fontFamily: 'IBM Plex Mono' },
+  tick: { fill: tokens.textLo, fontSize: 13, fontFamily: 'IBM Plex Mono' },
 }
 
 export default function DataRoute() {
@@ -38,8 +38,8 @@ export default function DataRoute() {
     queryFn: api.datasetSummary,
   })
 
-  if (isPending) return <p className="p-8 text-[13px] text-lo">Loading dataset…</p>
-  if (error) return <p className="p-8 text-[13px] text-lo">{(error as Error).message}</p>
+  if (isPending) return <p className="p-8 text-[15.5px] text-lo">Loading dataset…</p>
+  if (error) return <p className="p-8 text-[15.5px] text-lo">{(error as Error).message}</p>
 
   const hourly = data.hourly.map((h) => ({
     hour: String(h.hour).padStart(2, '0'),
@@ -57,7 +57,7 @@ export default function DataRoute() {
         <h1 className="font-display text-lg text-hi tracking-display">
           The dataset is synthetic
         </h1>
-        <p className="text-[13px] text-lo mt-1 max-w-3xl leading-relaxed">
+        <p className="text-[15.5px] text-lo mt-1 max-w-3xl leading-relaxed">
           No real bank data, no real PII, no real account numbers. The generator is
           calibrated to publicly reported I4C and RBI figures on layering depth, cash-out
           timing and mule prevalence, and every distribution choice is documented in{' '}
@@ -77,10 +77,10 @@ export default function DataRoute() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <section className="panel p-4">
-          <h2 className="font-display text-[14px] text-hi tracking-display mb-1">
+          <h2 className="font-display text-[16.5px] text-hi tracking-display mb-1">
             Activity by hour of day
           </h2>
-          <p className="text-[11.5px] text-lo mb-3">
+          <p className="text-[13.5px] text-lo mb-3">
             Peaks near 11:00 and 20:00 IST, matching the reported intraday UPI shape.
           </p>
           <div className="h-[220px]">
@@ -95,7 +95,7 @@ export default function DataRoute() {
                     background: tokens.inkRaised,
                     border: `1px solid ${tokens.inkLine}`,
                     borderRadius: 3,
-                    fontSize: 12,
+                    fontSize: 14,
                     fontFamily: 'IBM Plex Mono',
                     color: tokens.textHi,
                   }}
@@ -108,10 +108,10 @@ export default function DataRoute() {
         </section>
 
         <section className="panel p-4">
-          <h2 className="font-display text-[14px] text-hi tracking-display mb-1">
+          <h2 className="font-display text-[16.5px] text-hi tracking-display mb-1">
             Account archetypes
           </h2>
-          <p className="text-[11.5px] text-lo mb-3">
+          <p className="text-[13.5px] text-lo mb-3">
             The highlighted bar is the hard-negative class: legitimate high-velocity
             accounts that behave almost exactly like layering mules.
           </p>
@@ -131,7 +131,7 @@ export default function DataRoute() {
                     background: tokens.inkRaised,
                     border: `1px solid ${tokens.inkLine}`,
                     borderRadius: 3,
-                    fontSize: 12,
+                    fontSize: 14,
                     fontFamily: 'IBM Plex Mono',
                     color: tokens.textHi,
                   }}
@@ -152,16 +152,16 @@ export default function DataRoute() {
       </div>
 
       <section className="panel p-4 mt-3">
-        <h2 className="font-display text-[14px] text-hi tracking-display mb-3">
+        <h2 className="font-display text-[16.5px] text-hi tracking-display mb-3">
           Channel mix
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {data.channels.map((channel) => (
             <div key={channel.name}>
-              <div className="font-mono text-[15px] text-hi">
+              <div className="font-mono text-[17.5px] text-hi">
                 {percent(channel.count / data.transactions)}
               </div>
-              <div className="text-[11px] text-lo mt-0.5">{channel.name}</div>
+              <div className="text-[13px] text-lo mt-0.5">{channel.name}</div>
               <div className="h-1 bg-ink-line mt-1.5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-lo"
@@ -171,7 +171,7 @@ export default function DataRoute() {
             </div>
           ))}
         </div>
-        <p className="text-[11.5px] text-lo mt-3 leading-relaxed">
+        <p className="text-[13.5px] text-lo mt-3 leading-relaxed">
           ATM withdrawal is 6% of ordinary traffic by design. If only mules used ATMs,
           cash-out proximity would trivially solve detection and every benchmark number
           afterwards would be worthless.

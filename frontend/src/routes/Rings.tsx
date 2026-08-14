@@ -45,7 +45,7 @@ export default function Rings() {
             onSelect={setScenario}
           />
         ) : (
-          <p className="text-[12px] text-lo">Loading incidents…</p>
+          <p className="text-[14px] text-lo">Loading incidents…</p>
         )}
       </aside>
 
@@ -54,7 +54,7 @@ export default function Rings() {
           <h1 className="font-display text-lg text-hi tracking-display">
             Rings found in this incident
           </h1>
-          <p className="text-[12.5px] text-lo mt-1.5 max-w-3xl leading-relaxed">
+          <p className="text-[15px] text-lo mt-1.5 max-w-3xl leading-relaxed">
             Communities recovered by Louvain over the accounts the detector
             flagged, on a graph that combines transfer volume with shared-device
             and shared-IP links. Nothing below uses the generator&rsquo;s
@@ -63,20 +63,20 @@ export default function Rings() {
         </header>
 
         {discovered.isPending && (
-          <p className="flex items-center gap-2 text-[13px] text-lo">
+          <p className="flex items-center gap-2 text-[15.5px] text-lo">
             <Loader2 size={14} className="animate-spin" aria-hidden />
             Clustering…
           </p>
         )}
 
         {discovered.error && (
-          <p className="text-[13px] text-lo">
+          <p className="text-[15.5px] text-lo">
             {(discovered.error as Error).message}
           </p>
         )}
 
         {discovered.data && discovered.data.length === 0 && (
-          <p className="text-[13px] text-lo max-w-xl leading-relaxed">
+          <p className="text-[15.5px] text-lo max-w-xl leading-relaxed">
             No community in this incident is large enough to call a ring. Try an
             incident with a longer complaint delay, where more of the structure
             has had time to appear.
@@ -93,16 +93,16 @@ export default function Rings() {
 
         {truth.data && (
           <section className="mt-8 pt-5 border-t border-ink-line">
-            <h2 className="font-display text-[15px] text-hi tracking-display">
+            <h2 className="font-display text-[17.5px] text-hi tracking-display">
               Ground truth: what the generator actually injected
             </h2>
-            <p className="text-[12px] text-lo mt-1.5 mb-4 max-w-3xl leading-relaxed">
+            <p className="text-[14px] text-lo mt-1.5 mb-4 max-w-3xl leading-relaxed">
               Twelve rings across four typologies. Shown so the discovery above
               can be checked rather than taken on trust.
             </p>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px] border-collapse min-w-[700px]">
+              <table className="w-full text-[14px] border-collapse min-w-[700px]">
                 <thead>
                   <tr className="text-lo text-left">
                     <th className="font-normal py-2 pr-4">Ring</th>
@@ -147,7 +147,7 @@ export default function Rings() {
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-lo/70 mt-3">
+            <p className="text-[13px] text-lo/70 mt-3">
               {count(truth.data.reduce((sum, r) => sum + r.accounts, 0))} mule
               accounts in total.
             </p>
