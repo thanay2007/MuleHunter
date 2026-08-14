@@ -259,7 +259,7 @@ backend/
                        warehouse (DuckDB)
     detect/            baseline_rules, gbdt, gnn, rings, explain, train
     interdict/         propagate, greedy, exact_cpsat, policies, replay
-    eval/              harness, metrics
+    eval/              harness, metrics, external (transfer test)
   tests/               phase acceptance tests + API contract tests
 frontend/
   src/
@@ -275,14 +275,24 @@ frontend/
 ```
 GET  /api/health                          artifact state, live
 GET  /api/scenarios                       the six seeded incidents
-GET  /api/graph/{scenario_id}             nodes, edges, layout seed
+GET  /api/graph/{scenario_id}             nodes, links, layout seed
 POST /api/interdict                       freeze plan + replayed outcome
 GET  /api/account/{id}?scenario_id=...    features, SHAP, marginal recovery
 GET  /api/rings/{scenario_id}             communities found in this incident
 GET  /api/evaluate                        benchmark.json
 GET  /api/detector                        detector_report.json
 WS   /ws/replay/{scenario_id}?policy=...  per-minute frames, both timelines
+POST /api/intake                          file an arbitrary complaint
+GET  /api/freeze-order/{id}               plan grouped by holding bank
+GET  /api/freeze-order/{id}.pdf           the issued memorandum
 ```
+
+`POST /api/intake` takes any account in the dataset, any amount and any pair of
+times, and runs the same tracing, scoring, rollout and solve the six seeded
+scenarios use — the resulting incident is addressable by every route above, so
+the demo scenarios are demonstrably not hardcoded. `/api/freeze-order` returns
+the plan grouped by holding bank, because eight institutions each act only on
+their own accounts; the PDF is byte-identical for identical inputs.
 
 The replay socket carries *both* timelines in every frame — do-nothing on one side,
 Chakravyuh on the other — so the split comparison on the console is two views of one
@@ -349,6 +359,20 @@ else on the page.
    moves faster once it learns the response time. None of that is modelled.
 6. **No identity resolution, no KYC linkage, no cross-border leg.** The graph stops at the
    exit node.
+7. **No external validation has been run yet.** Every number on this page is measured on
+   data this repository generated, which is the weakest form of evidence available. The
+   transfer harness is written and works — `python -m app.eval.external <transactions.csv>`
+   normalises an [IBM AMLSim](https://github.com/IBM/AMLSim/) export and scores against it
+   — but AMLSim ships parameter files rather than generated data, and the pre-generated
+   Kaggle export needs an API token, so **the number has not been produced**. It is stated
+   as an open item rather than quietly omitted.
+
+   One thing the harness already makes clear, and it is worth saying in advance: a foreign
+   transaction log carries no device fingerprints, no dormancy history, no KYC tier and no
+   taint share. Several of the features carrying this detector are simply absent over
+   there, so the transferable part of the signal is structural — fan-out and forwarding
+   speed — and a transfer score measures that, not this model. Expect it to be much worse
+   than 0.99, and expect that to be the honest and interesting result.
 
 ## License
 

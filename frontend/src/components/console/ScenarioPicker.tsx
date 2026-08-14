@@ -8,56 +8,48 @@ interface Props {
 }
 
 /**
- * The six seeded incidents. Complaint delay is surfaced on every card because
- * it is the variable that matters most to recovery -- the whole product is a
- * bet on the golden hour.
+ * The six seeded incidents, as a dropdown plus a one-line summary.
+ *
+ * This used to be six stacked cards. They read well, but they consumed most of
+ * the left rail and pushed the ordered freeze plan below the fold on a
+ * 1366x768 projector -- and the plan is the product. Picking the case is a
+ * five-second act at the start of a four-minute demo, so it gets a control
+ * sized like one.
+ *
+ * Complaint delay survives the compression, because it is the variable that
+ * matters most to recovery: the whole product is a bet on the golden hour.
  */
 export default function ScenarioPicker({ scenarios, selectedId, onSelect }: Props) {
+  const selected = scenarios.find((s) => s.scenario_id === selectedId) ?? null
+  const urgent = selected ? selected.complaint_delay_minutes <= 45 : false
+
   return (
-    <div className="flex flex-col gap-1.5">
-      {scenarios.map((scenario) => {
-        const active = scenario.scenario_id === selectedId
-        const urgent = scenario.complaint_delay_minutes <= 45
+    <div>
+      <label className="sr-only" htmlFor="case-select">
+        Case
+      </label>
+      <select
+        id="case-select"
+        value={selectedId ?? ''}
+        onChange={(event) => onSelect(event.target.value)}
+        className="w-full bg-ink-raised border border-ink-line rounded-panel px-2 py-1.5 text-[14px] text-hi focus:outline-none focus:border-hi/40 cursor-pointer"
+      >
+        {scenarios.map((scenario) => (
+          <option key={scenario.scenario_id} value={scenario.scenario_id}>
+            {scenario.scenario_id} — {scenario.name.split(' — ')[0]} ·{' '}
+            {rupees(scenario.amount_inr)}
+          </option>
+        ))}
+      </select>
 
-        return (
-          <button
-            key={scenario.scenario_id}
-            type="button"
-            onClick={() => onSelect(scenario.scenario_id)}
-            aria-pressed={active}
-            className={[
-              'w-full text-left px-3 py-2.5 rounded-panel border transition-colors',
-              active
-                ? 'bg-ink-raised border-hi/40'
-                : 'bg-transparent border-ink-line hover:border-lo/50',
-            ].join(' ')}
-          >
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[13px] text-lo">{scenario.scenario_id}</span>
-              <span className="font-mono text-[14px] text-hi">
-                {rupees(scenario.amount_inr)}
-              </span>
-            </div>
-
-            <div className="text-[15px] text-hi leading-snug mt-0.5">
-              {scenario.name.split(' — ')[0]}
-            </div>
-
-            <div className="text-[13px] text-lo mt-1 flex items-center gap-1.5 flex-wrap">
-              <span>{scenario.victim_district}</span>
-              <span aria-hidden>·</span>
-              <span>{typologyLabel(scenario.ring_typology)}</span>
-            </div>
-
-            <div className="mt-1.5 flex items-center gap-1.5 text-[13px]">
-              <span className="text-lo">reported after</span>
-              <span className={`font-mono ${urgent ? 'text-hi' : 'text-lo'}`}>
-                {duration(scenario.complaint_delay_minutes)}
-              </span>
-            </div>
-          </button>
-        )
-      })}
+      {selected && (
+        <p className="text-[12.5px] text-lo mt-1 leading-snug truncate">
+          {selected.victim_district} · {typologyLabel(selected.ring_typology)} ·{' '}
+          <span className={`font-mono ${urgent ? 'text-hi' : 'text-lo'}`}>
+            {duration(selected.complaint_delay_minutes)}
+          </span>
+        </p>
+      )}
     </div>
   )
 }

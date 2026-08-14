@@ -206,6 +206,11 @@ class RingOut(BaseModel):
     total_flow_inr: float
     cashout_capacity_inr: float
     mean_p_mule: float
+    #: Spread, not just the centre. The mean is 1.00 on every ring here, which
+    #: reads as leakage; the distribution is what makes the figure honest.
+    p_mule_min: float
+    p_mule_median: float
+    p_mule_histogram: list[int]
     confidence: float
     dormancy_days_median: float
     members: list[str]
@@ -256,6 +261,9 @@ def rings_for_scenario(scenario_id: str) -> list[RingOut]:
             total_flow_inr=ring.total_flow_inr,
             cashout_capacity_inr=ring.cashout_capacity_inr,
             mean_p_mule=ring.mean_p_mule,
+            p_mule_min=ring.p_mule_min,
+            p_mule_median=ring.p_mule_median,
+            p_mule_histogram=list(ring.p_mule_histogram),
             confidence=ring.confidence,
             dormancy_days_median=ring.dormancy_days_median,
             members=list(ring.accounts[:60]),

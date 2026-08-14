@@ -158,7 +158,12 @@ def _window(dataset: Dataset, start: datetime, end: datetime) -> pl.DataFrame:
 
 
 def build_incident_graph(
-    scenario_id: str, context_hops: int | None = None
+    scenario_id: str,
+    context_hops: int | None = None,
+    *,
+    victim_account: str | None = None,
+    amount_inr: float | None = None,
+    incident_time: datetime | None = None,
 ) -> IncidentGraph:
     """Slice the incident subgraph for a scenario out of the full dataset.
 
@@ -173,20 +178,28 @@ def build_incident_graph(
     because the canvas is a replay of what happened -- the *solver* is the part
     that is restricted to what was visible at the complaint time.
     """
-    scenario = SCENARIOS_BY_ID.get(scenario_id)
-    if scenario is None:
-        raise KeyError(f"Unknown scenario {scenario_id!r}")
+    # The three overrides let a complaint filed through intake draw its canvas
+    # from the same code as a seeded scenario. They are passed explicitly
+    # rather than as an `Incident` because `incidents.py` imports from this
+    # module, and taking the type here would close the cycle.
+    if victim_account is None or amount_inr is None or incident_time is None:
+        scenario = SCENARIOS_BY_ID.get(scenario_id)
+        if scenario is None:
+            raise KeyError(f"Unknown scenario {scenario_id!r}")
+        victim_account = scenario.victim_account
+        amount_inr = scenario.amount_inr
+        incident_time = scenario.incident_time
 
     from app.graphstore.trace import trace_taint, transaction_index
 
     dataset = load_dataset()
     horizon = timedelta(hours=settings.incident_horizon_hours)
-    start = scenario.incident_time
+    start = incident_time
     end = start + horizon
 
     state = trace_taint(
-        scenario.victim_account,
-        scenario.amount_inr,
+        victim_account,
+        amount_inr,
         start,
         end,
         transaction_index(),
@@ -197,7 +210,7 @@ def build_incident_graph(
         account: start + timedelta(seconds=epoch - state.t0)
         for account, epoch in state.first_seen.items()
     }
-    depth = _taint_depth(state, scenario.victim_account)
+    depth = _taint_depth(state, victim_account)
 
     core = set(arrival)
     if context_hops is None:
@@ -211,7 +224,8 @@ def build_incident_graph(
     }
 
     return _assemble(
-        dataset, scenario, arrival, depth, context, edges, start, state, tainted
+        dataset, scenario_id, victim_account, arrival, depth, context, edges,
+        start, state, tainted,
     )
 
 
@@ -287,7 +301,8 @@ def _context_neighbours(window: pl.DataFrame, core: set[str]) -> set[str]:
 
 def _assemble(
     dataset: Dataset,
-    scenario: Scenario,
+    scenario_id: str,
+    victim_account: str,
     arrival: dict[str, datetime],
     depth: dict[str, int],
     context: set[str],
@@ -335,7 +350,7 @@ def _assemble(
         archetype = str(meta["archetype"])
         is_mule = bool(meta["is_mule"]) if meta["is_mule"] is not None else False
 
-        if account_id == scenario.victim_account:
+        if account_id == victim_account:
             kind = "victim"
         elif archetype == "exit_point":
             kind = "exit"
@@ -370,9 +385,12 @@ def _assemble(
         )
 
     return IncidentGraph(
-        scenario_id=scenario.scenario_id,
-        victim_account=scenario.victim_account,
-        incident_time=scenario.incident_time,
+        scenario_id=scenario_id,
+        victim_account=victim_account,
+        # `t0` is the incident time -- the same value the caller sliced the
+        # window from, so the graph cannot report a different start than it
+        # was built against.
+        incident_time=t0,
         horizon_minutes=settings.incident_horizon_hours * 60,
         nodes=nodes,
         links=links,

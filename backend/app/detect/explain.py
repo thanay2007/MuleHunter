@@ -100,6 +100,19 @@ def attributions(
     ]
 
 
+def reason_codes(detector, matrix: FeatureMatrix, account_id: str, top_n: int = 3) -> list[str]:
+    """The strongest reasons this account was flagged, in plain language.
+
+    Lives here rather than in a route because three surfaces need exactly the
+    same sentences: the console's freeze queue, the issued freeze order, and
+    the audit trail. "Why was my customer's account frozen" is the first
+    question a real bank asks, and answering it differently in the document
+    than on the screen would be worse than not answering it at all.
+    """
+    found = attributions(detector, matrix, account_id, top_n=top_n)
+    return [phrase(a) for a in found if a.direction == "raises"][:top_n]
+
+
 def phrase(attribution: Attribution) -> str:
     """Turn one attribution into a sentence a non-specialist can read."""
     name = attribution.feature

@@ -22,12 +22,16 @@ from app.detect.gbdt import Detector, load_detector
 from app.graphstore.build import Dataset, load_dataset
 from app.graphstore.incidents import Incident, scenario_incident
 from app.graphstore.trace import TransactionIndex, transaction_index
-from app.interdict.policies import IncidentContext, build_context
+from app.interdict.greedy import FreezePlan
+from app.interdict.policies import IncidentContext, build_context, plan_for
 
 log = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 _contexts: "OrderedDict[str, IncidentContext]" = OrderedDict()
+_plans: "OrderedDict[str, FreezePlan]" = OrderedDict()
+#: Incidents filed through the intake form, addressable by id like a scenario.
+_incidents: "OrderedDict[str, Incident]" = OrderedDict()
 _detector: Detector | None = None
 _detector_loaded = False
 
@@ -78,8 +82,63 @@ def context_for(incident: Incident) -> IncidentContext:
     return built
 
 
+def register_incident(incident: Incident) -> None:
+    """Make an intake incident addressable like one of the six seeded ones.
+
+    Everything downstream -- the graph, the plan, the replay socket, the freeze
+    order -- looks incidents up by id. Registering here rather than threading a
+    second kind of incident through those routes means a complaint typed into
+    the intake form runs the *same* code path as S1, which is the whole point
+    of having the form: it proves the six scenarios are not hardcoded theatre.
+    """
+    with _lock:
+        _incidents[incident.incident_id] = incident
+        _incidents.move_to_end(incident.incident_id)
+        while len(_incidents) > settings.intake_cache_size:
+            _incidents.popitem(last=False)
+
+
+def incident_for(scenario_id: str) -> Incident:
+    """A seeded scenario, or an incident filed through intake."""
+    with _lock:
+        filed = _incidents.get(scenario_id)
+    if filed is not None:
+        return filed
+    return scenario_incident(scenario_id)
+
+
 def context_for_scenario(scenario_id: str) -> IncidentContext:
-    return context_for(scenario_incident(scenario_id))
+    return context_for(incident_for(scenario_id))
+
+
+def plan_for_scenario(
+    scenario_id: str, policy: str, budget_k: int, innocence_budget: float
+) -> FreezePlan:
+    """The plan for these settings, solved once and then remembered.
+
+    The freeze order and the console must quote the same plan -- same accounts,
+    same order, same issue minutes -- or the document a bank receives disagrees
+    with the screen it was approved on. Greedy is deterministic, so re-solving
+    would in fact produce the same answer; caching makes that a guarantee
+    rather than a property nobody re-checks, and keeps the order endpoint from
+    spending a second of solve time to reprint something already on screen.
+    """
+    key = f"{scenario_id}|{policy}|{budget_k}|{innocence_budget}"
+
+    with _lock:
+        cached = _plans.get(key)
+        if cached is not None:
+            _plans.move_to_end(key)
+            return cached
+
+    built = plan_for(policy, context_for_scenario(scenario_id), budget_k, innocence_budget)
+
+    with _lock:
+        _plans[key] = built
+        _plans.move_to_end(key)
+        while len(_plans) > settings.plan_cache_size:
+            _plans.popitem(last=False)
+    return built
 
 
 def warm(scenario_id: str = "S1") -> None:

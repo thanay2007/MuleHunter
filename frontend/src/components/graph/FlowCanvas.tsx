@@ -41,6 +41,12 @@ interface Props {
   selectedId: string | null
   frozen: Set<string>
   justFrozen: string[]
+  /**
+   * Nothing has run yet. The canvas shows the traced path dimmed rather than a
+   * near-empty field, so the "before" state reads as quiet and waiting instead
+   * of as a component that failed to load.
+   */
+  idle: boolean
   onSelect: (node: GraphNode | null) => void
 }
 
@@ -61,6 +67,24 @@ const ROW_PITCH = 15
 const ARRIVAL_GLOW_MINUTES = 25
 /** How long the freeze pulse lasts, in wall-clock ms. */
 const FREEZE_PULSE_MS = 700
+/**
+ * Force-layout ticks run before the first paint.
+ *
+ * Two hundred is enough for this graph to reach its columns, so the canvas
+ * appears already settled rather than drifting into place. The intermediate
+ * frames were the ones that looked broken.
+ */
+const IDLE_WARMUP_TICKS = 200
+/**
+ * Opacity of a node before the money has reached it.
+ *
+ * Was 0.16, which on a projector is indistinguishable from nothing -- the idle
+ * canvas read as a failed load. 0.4 is visibly present but still clearly
+ * unreached, so the replay lighting a node up is still a change you notice.
+ */
+const IDLE_NODE_ALPHA = 0.4
+/** The traced path before the run: amber at a quarter strength. */
+const IDLE_LINK_COLOR = 'rgba(224, 160, 60, 0.25)'
 
 function nodeColor(node: GraphNode): string {
   switch (node.kind) {
@@ -75,8 +99,14 @@ function nodeColor(node: GraphNode): string {
   }
 }
 
-function nodeRadius(node: GraphNode): number {
+function nodeRadius(node: GraphNode, idle = false): number {
   if (node.kind === 'victim') return 7.5
+  // Idle nodes get a floor: at 2.5px a column of unreached accounts is a line
+  // of specks, and the first impression of the product should not be one.
+  if (idle) {
+    const moved = node.tainted_in > 0 ? node.tainted_in : node.amount_in
+    return Math.max(3.6, Math.min(9.5, 2 + Math.log10(1 + moved) * 0.95))
+  }
   // Size by the victim's money that passed through, not by total volume: a
   // busy merchant that took ₹2,000 of stolen funds should not outweigh a mule
   // holding ₹4,00,000 of them.
@@ -87,6 +117,7 @@ function nodeRadius(node: GraphNode): number {
 export default function FlowCanvas({
   graph,
   minute,
+  idle,
   selectedId,
   frozen,
   justFrozen,
@@ -184,7 +215,7 @@ export default function FlowCanvas({
     (raw: SimNode, ctx: CanvasRenderingContext2D, scale: number) => {
       const x = raw.x ?? 0
       const y = raw.y ?? 0
-      const radius = nodeRadius(raw)
+      const radius = nodeRadius(raw, idle)
       const selected = raw.id === selectedId
       const isFrozen = frozen.has(raw.id)
 
@@ -194,8 +225,16 @@ export default function FlowCanvas({
       const glow = Math.max(0, 1 - sinceArrival / ARRIVAL_GLOW_MINUTES)
 
       // Accounts the money has not reached yet stay dark. This is what turns
-      // the canvas from a picture into a sequence.
-      ctx.globalAlpha = isContext ? 0.22 : reached || isFrozen ? 1 : 0.16
+      // the canvas from a picture into a sequence. Before the run, though,
+      // nothing has been reached, so that same rule made the whole graph
+      // invisible -- hence the idle floor.
+      ctx.globalAlpha = isContext
+        ? 0.22
+        : reached || isFrozen
+          ? 1
+          : idle
+            ? IDLE_NODE_ALPHA
+            : 0.16
 
       if (reached && glow > 0 && !isContext && !isFrozen) {
         ctx.beginPath()
@@ -247,7 +286,7 @@ export default function FlowCanvas({
         ctx.fillText('victim', x, y - radius - 8 / scale)
       }
     },
-    [selectedId, minute, frozen, reduceMotion],
+    [selectedId, minute, frozen, reduceMotion, idle],
   )
 
   // Column headers, drawn in graph space so they track zoom and pan.
@@ -304,9 +343,22 @@ export default function FlowCanvas({
           // moving through the same ring in the same window. Both produced
           // long edges across every column that buried the one path that
           // matters.
-          linkVisibility={(link) => link.tainted > 0 && link.minute <= minute}
-          linkColor={(link) => (isBlocked(link) ? tokens.inkLine : tokens.flow)}
-          linkWidth={(link) => (isBlocked(link) ? 0.5 : 1)}
+          // Before the run, the whole traced path is drawn faintly rather than
+          // hidden. An empty canvas with a few isolated dots reads as a failed
+          // load, which is a poor first thing for a judge to see; showing the
+          // route the money took, dimmed, reads as quiet and waiting -- and it
+          // makes the moment the replay lights it up mean something.
+          linkVisibility={(link) =>
+            link.tainted > 0 && (idle || link.minute <= minute)
+          }
+          linkColor={(link) =>
+            idle
+              ? IDLE_LINK_COLOR
+              : isBlocked(link)
+                ? tokens.inkLine
+                : tokens.flow
+          }
+          linkWidth={(link) => (idle ? 0.6 : isBlocked(link) ? 0.5 : 1)}
           linkDirectionalParticles={
             reduceMotion
               ? 0
@@ -324,6 +376,11 @@ export default function FlowCanvas({
           onNodeClick={(node) => onSelect(node)}
           onBackgroundClick={() => onSelect(null)}
           onEngineStop={fit}
+          // Settle the layout before the first paint instead of animating it
+          // into place. The nodes are laid out in columns by hop depth anyway,
+          // so watching them drift there adds nothing and the intermediate
+          // frames are the ones that look broken.
+          warmupTicks={IDLE_WARMUP_TICKS}
           cooldownTicks={90}
           d3VelocityDecay={0.45}
           enableNodeDrag={false}

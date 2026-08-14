@@ -50,6 +50,14 @@ class DiscoveredRing:
     total_flow_inr: float
     cashout_capacity_inr: float
     mean_p_mule: float
+    #: The mean saturates at 1.00 on this data, which reads as leakage to a
+    #: sceptical reader long before they reach the caveat. The spread is the
+    #: honest summary: min, median, and a coarse histogram of the members'
+    #: scores, so the card can show what the distribution actually looks like
+    #: instead of one number that is always the same.
+    p_mule_min: float
+    p_mule_median: float
+    p_mule_histogram: tuple[int, ...]
     confidence: float
     dormancy_days_median: float
 
@@ -109,6 +117,18 @@ def _add_shared_infrastructure(
                         graph.add_edge(a, b, weight=weight)
 
 
+#: Buckets in the per-ring score sparkline. Ten is enough to show whether the
+#: mass really does sit against 1.0 without pretending to a precision the
+#: card's twelve pixels of height could carry.
+SCORE_HISTOGRAM_BINS = 10
+
+
+def _score_histogram(scores) -> tuple[int, ...]:
+    """Member scores counted into equal-width buckets over [0, 1]."""
+    counts, _ = np.histogram(scores, bins=SCORE_HISTOGRAM_BINS, range=(0.0, 1.0))
+    return tuple(int(value) for value in counts)
+
+
 def detect_rings(
     accounts: list[str],
     edges: pl.DataFrame,
@@ -119,6 +139,9 @@ def detect_rings(
     ds = dataset if dataset is not None else load_dataset()
     graph = build_projection(accounts, edges, ds)
 
+    # Community detection is the NetworkX 3.x built-in. Do not re-add the
+    # `python-louvain` package for this -- it is source-only, fails to build
+    # against modern setuptools, and nothing here imports it.
     communities = nx.community.louvain_communities(
         graph,
         weight="weight",
@@ -184,6 +207,9 @@ def detect_rings(
                     sum(exit_flow.get(a, 0.0) for a in ordered), 2
                 ),
                 mean_p_mule=round(float(np.mean(p_mule)), 4),
+                p_mule_min=round(float(np.min(p_mule)), 4),
+                p_mule_median=round(float(np.median(p_mule)), 4),
+                p_mule_histogram=_score_histogram(p_mule),
                 confidence=_confidence(ordered, rows, scores),
                 dormancy_days_median=float(np.median(dormancy)) if dormancy else 0.0,
             )

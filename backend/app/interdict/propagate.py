@@ -148,12 +148,16 @@ def fit_behaviour(
 
     delays = (
         history.sort("epoch")
+        # Both sides are sorted by their join key, so each `src` group is too.
+        # Polars cannot check that once `by` groups are involved and warns every
+        # call; the hint states what the sorts above already guarantee.
         .join_asof(
             credits,
             left_on="epoch",
             right_on="credit_epoch",
             by="src",
             strategy="backward",
+            check_sortedness=False,
         )
         .drop_nulls("credit_epoch")
         .with_columns(

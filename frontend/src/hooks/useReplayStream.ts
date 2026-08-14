@@ -85,6 +85,7 @@ export function useReplayStream(
   policy: PolicyId,
   budgetK: number,
   innocenceBudget: number,
+  adaptiveAdversary: boolean,
   fps: number,
 ): ReplayStream {
   const [status, setStatus] = useState<StreamStatus>('idle')
@@ -115,7 +116,13 @@ export function useReplayStream(
     previousFrozen.current = EMPTY_FROZEN
 
     const ws = new WebSocket(
-      replayUrl(scenarioId, { policy, budgetK, innocenceBudget, fps }),
+      replayUrl(scenarioId, {
+        policy,
+        budgetK,
+        innocenceBudget,
+        adaptiveAdversary,
+        fps,
+      }),
     )
     socket.current = ws
 
@@ -157,7 +164,7 @@ export function useReplayStream(
       // A close after the final frame is the normal ending, not a failure.
       setStatus((current) => (current === 'streaming' ? 'done' : current))
     }
-  }, [scenarioId, policy, budgetK, innocenceBudget, fps, stop])
+  }, [scenarioId, policy, budgetK, innocenceBudget, adaptiveAdversary, fps, stop])
 
   useEffect(() => stop, [stop])
 

@@ -16,14 +16,15 @@ pydantic-settings>=2.6,<3.0
 websockets>=13.0
 
 # --- data ------------------------------------------------------------------
-polars>=1.12
+# 1.21 is the floor: `join_asof(check_sortedness=...)` arrived there, and
+# features.py / propagate.py use it to silence a per-request warning.
+polars>=1.21
 pyarrow>=17.0
 duckdb>=1.1
 numpy>=1.26,<3.0
 
 # --- graph -----------------------------------------------------------------
 networkx>=3.3
-python-louvain>=0.16
 
 # --- models ----------------------------------------------------------------
 lightgbm>=4.5
@@ -32,6 +33,12 @@ shap>=0.46
 
 # --- optimisation ----------------------------------------------------------
 ortools>=9.11
+
+# --- documents -------------------------------------------------------------
+# Freeze orders are rendered server-side as PDF. ReportLab is pure Python --
+# no system libraries, no headless browser -- which keeps the no-Docker,
+# air-gapped promise intact.
+reportlab>=4.0
 
 # --- test ------------------------------------------------------------------
 pytest>=8.3

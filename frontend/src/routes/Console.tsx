@@ -1,21 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Loader2, Play, RotateCcw } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { FileText, Loader2, Play, RotateCcw } from 'lucide-react'
 import { api, type GraphNode } from '@/api/client'
 import FlowCanvas from '@/components/graph/FlowCanvas'
 import FreezeFrontier from '@/components/graph/FreezeFrontier'
 import ScenarioPicker from '@/components/console/ScenarioPicker'
 import BudgetControls from '@/components/console/BudgetControls'
 import FreezeQueue from '@/components/console/FreezeQueue'
-import SplitCompare from '@/components/console/SplitCompare'
+import IntakeForm from '@/components/console/IntakeForm'
+import PolicyCompare from '@/components/console/PolicyCompare'
+import PolicySwitcher from '@/components/console/PolicySwitcher'
+import SplitCompare, {
+  type AdversaryNote,
+} from '@/components/console/SplitCompare'
 import IncidentTimeline from '@/components/console/IncidentTimeline'
 import LayoutToggle from '@/components/console/LayoutToggle'
 import LedgerStrip from '@/components/console/LedgerStrip'
 import Splitter from '@/components/console/Splitter'
 import AccountDrawer from '@/components/inspect/AccountDrawer'
+import CaseHeader from '@/components/portal/CaseHeader'
+import { RouteError } from '@/components/layout/RouteState'
 import { useReplayStream } from '@/hooks/useReplayStream'
-import { useConsole } from '@/store/console'
-import { count, duration, rupees } from '@/lib/format'
+import { useAudit } from '@/store/audit'
+import { runKey, useConsole } from '@/store/console'
+import { count } from '@/lib/format'
 import { tokens } from '@/theme/tokens'
 
 const REPLAY_FPS = 12
@@ -49,28 +58,8 @@ function Legend() {
   )
 }
 
-function DatasetMissing({ message }: { message: string }) {
-  return (
-    <div className="h-full flex items-center justify-center p-8">
-      <div className="panel p-6 max-w-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle size={16} className="text-hi" aria-hidden />
-          <h2 className="font-display text-base text-hi tracking-display">
-            No data loaded
-          </h2>
-        </div>
-        <p className="text-[15.5px] text-lo mb-3 leading-relaxed">{message}</p>
-        <pre className="font-mono text-[14px] text-hi bg-ink p-3 rounded-panel border border-ink-line whitespace-pre-wrap">
-          cd backend{'\n'}
-          python -m app.simulator.generator{'\n'}
-          python -m app.detect.train
-        </pre>
-      </div>
-    </div>
-  )
-}
-
 export default function Console() {
+  const navigate = useNavigate()
   const scenarioId = useConsole((s) => s.scenarioId)
   const policy = useConsole((s) => s.policy)
   const budgetK = useConsole((s) => s.budgetK)
@@ -87,6 +76,11 @@ export default function Console() {
   const setLayout = useConsole((s) => s.setLayout)
   const setLedgerHeight = useConsole((s) => s.setLedgerHeight)
   const setLedgerWidth = useConsole((s) => s.setLedgerWidth)
+  const passiveRecovery = useConsole((s) => s.passiveRecovery)
+  const rememberPassiveRecovery = useConsole((s) => s.rememberPassiveRecovery)
+  const rememberPolicyRun = useConsole((s) => s.rememberPolicyRun)
+  const record = useAudit((s) => s.record)
+  const filedIncidents = useConsole((s) => s.filedIncidents)
 
   const [sweepTrigger, setSweepTrigger] = useState(0)
   const sweptFor = useRef<string | null>(null)
@@ -108,9 +102,17 @@ export default function Console() {
     enabled: Boolean(scenarioId),
   })
 
+  // Seeded scenarios plus anything filed through intake this session. Merging
+  // here rather than special-casing means the picker, the docket, the timeline
+  // and the ledger all treat a filed complaint as an ordinary case.
+  const cases = useMemo(
+    () => [...(scenariosQuery.data ?? []), ...filedIncidents],
+    [scenariosQuery.data, filedIncidents],
+  )
+
   const scenario = useMemo(
-    () => scenariosQuery.data?.find((s) => s.scenario_id === scenarioId) ?? null,
-    [scenariosQuery.data, scenarioId],
+    () => cases.find((s) => s.scenario_id === scenarioId) ?? null,
+    [cases, scenarioId],
   )
 
   const stream = useReplayStream(
@@ -118,6 +120,7 @@ export default function Console() {
     policy,
     budgetK,
     innocenceBudget,
+    adaptive,
     REPLAY_FPS,
   )
 
@@ -130,11 +133,48 @@ export default function Console() {
         innocence_budget: innocenceBudget,
         adaptive_adversary: adaptive,
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const share = data.amount_inr > 0 ? data.outcome.prevented_inr / data.amount_inr : 0
+      // Passive runs are the reference the adaptive caption reads back later.
+      if (!adaptive && scenarioId && data.amount_inr > 0) {
+        rememberPassiveRecovery(
+          runKey(scenarioId, policy, budgetK, innocenceBudget),
+          share,
+        )
+      }
+      // Every run feeds the head-to-head strip, so switching policy during the
+      // demo accumulates a comparison rather than replacing one.
+      if (scenarioId) {
+        rememberPolicyRun(scenarioId, {
+          policy: data.policy,
+          policyLabel: data.policy_label,
+          recoveryShare: share,
+          preventedInr: data.outcome.prevented_inr,
+          innocentFrozen: data.outcome.innocent_frozen,
+          frozen: data.plan.length,
+          budgetK: data.budget_k,
+          innocenceBudget: data.innocence_budget,
+          adaptiveAdversary: data.adaptive_adversary,
+        })
+      }
+      record('solve', `Plan produced for ${data.scenario_id}`, {
+        policy: data.policy,
+        budget_k: data.budget_k,
+        innocence_budget: data.innocence_budget,
+        adaptive_adversary: data.adaptive_adversary,
+        instructions: data.plan.length,
+        solve_ms: Math.round(data.solve_ms),
+        candidates_scored: data.candidates_considered,
+        prevented_inr: Math.round(data.outcome.prevented_inr),
+        innocent_frozen: data.outcome.innocent_frozen,
+      })
       setPhase('running')
       stream.start()
     },
-    onError: () => setPhase('idle'),
+    onError: (error) => {
+      record('solve', 'Solve failed', { error: (error as Error).message })
+      setPhase('idle')
+    },
   })
 
   const run = useCallback(() => {
@@ -160,12 +200,46 @@ export default function Console() {
     if (stream.status === 'done') setPhase('done')
   }, [stream.status, setPhase])
 
-  const reported = scenario ? minute >= scenario.complaint_delay_minutes : false
+  // One line per case opened, so the log starts where the operator did.
+  useEffect(() => {
+    if (scenario) {
+      record('case', `Case opened: ${scenario.case_id}`, {
+        scenario: scenario.scenario_id,
+        complaint_ref: scenario.complaint_ref,
+        amount_inr: scenario.amount_inr,
+        reported_after_min: scenario.complaint_delay_minutes,
+      })
+    }
+  }, [scenario?.scenario_id])  // eslint-disable-line react-hooks/exhaustive-deps
+
   const plan = interdiction.data?.plan ?? []
   const busy = phase === 'planning' || interdiction.isPending
 
+  // Only annotate an adaptive run, and only once the figures on screen came
+  // from that run -- the caption must never describe a result it is not
+  // sitting next to.
+  const adversaryNote = useMemo((): AdversaryNote | null => {
+    const result = interdiction.data
+    if (!result || !result.adaptive_adversary || result.amount_inr <= 0) {
+      return null
+    }
+    return {
+      reroutedTransfers: result.outcome.rerouted_transfers,
+      recoveryShare: result.outcome.prevented_inr / result.amount_inr,
+      passiveRecoveryShare:
+        passiveRecovery[
+          runKey(
+            result.scenario_id,
+            result.policy,
+            result.budget_k,
+            result.innocence_budget,
+          )
+        ] ?? null,
+    }
+  }, [interdiction.data, passiveRecovery])
+
   if (scenariosQuery.error) {
-    return <DatasetMissing message={(scenariosQuery.error as Error).message} />
+    return <RouteError error={scenariosQuery.error} subject="the case list" />
   }
 
   return (
@@ -177,25 +251,35 @@ export default function Console() {
           -- without that fallback the solver stats were being clipped off the
           bottom edge rather than becoming reachable. */}
       <aside className="w-[286px] shrink-0 border-r border-ink-line flex flex-col overflow-y-auto">
-        <div className="px-4 pt-4 pb-3 shrink-0 max-h-[38%] overflow-y-auto">
-          <h2 className="label-lo mb-2">Pick a case</h2>
-          {scenariosQuery.data ? (
+        {/* Collapsed to a dropdown: the ordered freeze plan below is the
+            product, and six scenario cards were pushing it under the fold on a
+            1366x768 projector. Choosing the case is a five-second act at the
+            start; reading the plan is the rest of the demo. */}
+        <div className="px-4 pt-2.5 pb-2 shrink-0">
+          {cases.length > 0 ? (
             <ScenarioPicker
-              scenarios={scenariosQuery.data}
+              scenarios={cases}
               selectedId={scenarioId}
               onSelect={setScenario}
             />
           ) : (
             <p className="text-[14px] text-lo">Loading cases…</p>
           )}
+          <div className="mt-2">
+            <IntakeForm scenarios={scenariosQuery.data} />
+          </div>
         </div>
 
-        <div className="px-4 py-4 border-t border-ink-line shrink-0">
-          <h2 className="label-lo mb-3">Limits</h2>
-          <BudgetControls />
+        <div className="px-4 py-2 border-t border-ink-line shrink-0">
+          <h2 className="label-lo mb-1">Who plans it</h2>
+          <PolicySwitcher />
         </div>
 
-        <div className="px-4 py-4 border-t border-ink-line shrink-0">
+        <div className="px-4 py-2 border-t border-ink-line shrink-0">
+          <BudgetControls plan={plan} />
+        </div>
+
+        <div className="px-4 py-2 border-t border-ink-line shrink-0">
           <button
             type="button"
             onClick={run}
@@ -225,46 +309,64 @@ export default function Console() {
             )}
           </button>
 
+          {/* The closing beat: complaint -> plan -> replay -> signed order.
+              Only offered once the replay has finished, because issuing
+              instructions from a half-watched plan is not the story. */}
+          {phase === 'done' && plan.length > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate('/orders')}
+              className="w-full mt-2 py-2 rounded-panel border border-ink-line text-[15.5px] text-lo hover:text-hi hover:border-hi/40 flex items-center justify-center gap-2 transition-colors"
+            >
+              <FileText size={13} aria-hidden />
+              Generate freeze orders
+            </button>
+          )}
+
           {interdiction.error && (
             <p className="text-[13px] text-lo mt-2 leading-relaxed">
               {(interdiction.error as Error).message}
             </p>
           )}
 
+          {/* One dense line rather than a four-row table. The numbers still
+              matter -- they answer "does it run fast enough" -- but they are
+              reference, not the headline, and they were costing the freeze
+              queue sixty pixels it needed more. */}
           {interdiction.data && (
-            <dl className="mt-3 space-y-1.5">
-              {[
-                ['Time to solve', `${interdiction.data.solve_ms.toFixed(0)} ms`],
-                // Two different sets, deliberately named apart: the solver
-                // scores every account the money could reach, while the canvas
-                // draws only the ones it actually did.
-                ['Accounts checked', count(interdiction.data.candidates_considered)],
-                [
-                  'Shown here',
-                  count(graphQuery.data?.nodes.length ?? 0),
-                ],
-                [
-                  'Simulations',
-                  `${count(interdiction.data.rollouts)} × ${count(
-                    Math.round(
-                      interdiction.data.particles / interdiction.data.rollouts,
-                    ),
-                  )}`,
-                ],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-2 text-[13px]">
-                  <dt className="text-lo">{label}</dt>
-                  <dd className="font-mono text-hi tabular-nums">{value}</dd>
-                </div>
-              ))}
-            </dl>
+            <p
+              className="mt-2 text-[12px] text-lo leading-snug"
+              title="Solve time · accounts the solver scored · nodes drawn · rollouts × particles"
+            >
+              <span className="font-mono text-hi tabular-nums">
+                {interdiction.data.solve_ms.toFixed(0)} ms
+              </span>{' '}
+              ·{' '}
+              <span className="font-mono text-hi tabular-nums">
+                {count(interdiction.data.candidates_considered)}
+              </span>{' '}
+              checked ·{' '}
+              <span className="font-mono text-hi tabular-nums">
+                {count(graphQuery.data?.nodes.length ?? 0)}
+              </span>{' '}
+              drawn ·{' '}
+              <span className="font-mono text-hi tabular-nums">
+                {count(interdiction.data.rollouts)}×
+                {count(
+                  Math.round(
+                    interdiction.data.particles / interdiction.data.rollouts,
+                  ),
+                )}
+              </span>{' '}
+              sims
+            </p>
           )}
         </div>
 
         {/* Floor rather than min-h-0: the queue keeps a usable height and the
             rail scrolls instead, which beats collapsing it to nothing. */}
-        <div className="px-4 py-4 border-t border-ink-line flex-1 min-h-[190px] flex flex-col">
-          <div className="flex items-baseline justify-between mb-2 shrink-0">
+        <div className="px-4 py-2 border-t border-ink-line flex-1 min-h-[150px] flex flex-col">
+          <div className="flex items-baseline justify-between mb-1.5 shrink-0">
             <h2 className="label-lo">Accounts to freeze</h2>
             {plan.length > 0 && (
               <span className="font-mono text-[13px] text-lo tabular-nums">
@@ -291,44 +393,15 @@ export default function Console() {
 
       {/* ------------------------------------------------------------- centre */}
       <section className="flex-1 min-w-0 flex flex-col relative">
-        <div className="shrink-0 flex items-center justify-between px-5 h-11 border-b border-ink-line">
-          <div className="flex items-baseline gap-3 min-w-0">
-            {scenario ? (
-              <>
-                <span className="font-mono text-[14px] text-lo">
-                  {scenario.scenario_id}
-                </span>
-                <span className="text-[15.5px] text-hi truncate">
-                  {scenario.name}
-                </span>
-              </>
-            ) : (
-              <span className="text-[15.5px] text-lo">Pick a case to begin</span>
-            )}
-          </div>
-
-          {/* The clock and replay state live on the timeline below; repeating
-              them here just crowds the bar. */}
-          {scenario && (
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[13px] text-lo">
-                <span className="font-mono tabular-nums text-hi">
-                  {rupees(scenario.amount_inr)}
-                </span>{' '}
-                · reported after {duration(scenario.complaint_delay_minutes)}
-              </span>
-              <span
-                className={[
-                  'text-[13px] px-2 py-0.5 rounded-panel border',
-                  reported ? 'text-hi border-hi/40' : 'text-lo border-ink-line',
-                ].join(' ')}
-              >
-                {reported ? 'reported' : 'not reported yet'}
-              </span>
-              <LayoutToggle />
-            </div>
-          )}
-        </div>
+        {/* The case docket. Replaces the old scenario strip: same job, but it
+            quotes the case and complaint references the freeze order and the
+            audit trail use, and it counts down the recoverable window. */}
+        <CaseHeader
+          scenario={scenario}
+          phase={phase}
+          minute={minute}
+          actions={scenario ? <LayoutToggle /> : null}
+        />
 
       {/* Canvas and ledger share the remaining space. In `side` they sit next
           to each other; otherwise the ledger sits underneath. The timeline
@@ -363,6 +436,7 @@ export default function Console() {
             <FlowCanvas
               graph={graphQuery.data}
               minute={minute}
+              idle={phase === 'idle'}
               selectedId={selectedNode?.id ?? null}
               frozen={stream.frozen}
               justFrozen={stream.justFrozen}
@@ -392,6 +466,11 @@ export default function Console() {
             innocenceBudget={innocenceBudget}
             onClose={() => selectNode(null)}
           />
+        </div>
+
+        {/* The live head-to-head, directly under the canvas it describes. */}
+        <div className="shrink-0">
+          <PolicyCompare scenarioId={scenarioId} activePolicy={policy} />
         </div>
 
         {scenario && (
@@ -430,15 +509,17 @@ export default function Console() {
                 layout === 'side' ? 'Resize the money panel' : 'Resize the money panel'
               }
             />
+            {/* The cap is what keeps the graph on screen. The drag height is a
+                preference; on a 1366x768 projector, with the portal chrome
+                above, an unclamped 330px band left the canvas about forty
+                pixels tall. The canvas keeps the majority of the space no
+                matter what the divider was last dragged to. */}
             <div
-              className={[
-                'shrink-0 overflow-y-auto',
-                layout === 'side' ? 'p-4' : 'p-4',
-              ].join(' ')}
+              className="shrink-0 overflow-y-auto p-4"
               style={
                 layout === 'side'
-                  ? { width: ledgerWidth }
-                  : { height: ledgerHeight }
+                  ? { width: ledgerWidth, maxWidth: '42%' }
+                  : { height: ledgerHeight, maxHeight: '46%' }
               }
             >
             {scenario ? (
@@ -454,6 +535,7 @@ export default function Console() {
                 baselineInnocentFrozen={
                   stream.header?.final.baseline.innocent_frozen ?? 0
                 }
+                adversary={adversaryNote}
                 dense={layout === 'side'}
               />
             ) : (

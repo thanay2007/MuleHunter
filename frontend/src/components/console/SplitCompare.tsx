@@ -28,12 +28,62 @@ interface Props {
   amountInr: number
   innocentFrozen: number
   baselineInnocentFrozen: number
+  /** The adaptive-adversary run, reported under our own column and nowhere
+   *  else -- it is a caveat on our result, not on current practice. */
+  adversary: AdversaryNote | null
   /**
    * Docked into a narrow column rather than spread across the bottom. The two
    * sides stack vertically, and the divider turns from a vertical hairline into
    * a horizontal one.
    */
   dense?: boolean
+}
+
+export interface AdversaryNote {
+  /** Transfers the operator pushed down another path after we blocked one. */
+  reroutedTransfers: number
+  /** Recovery under this run: prevented rupees over rupees stolen. */
+  recoveryShare: number
+  /**
+   * The same case under a passive adversary, if this console has run it. Null
+   * until it has -- an unproven arrow is worse than no arrow.
+   */
+  passiveRecoveryShare: number | null
+}
+
+/**
+ * What the adaptive adversary cost us, stated plainly under our own column.
+ *
+ * Crimson is money lost, and that is exactly what this sentence reports, so it
+ * is inside the colour language rather than an exception to it. It is drawn as
+ * an outline instead of a fill because it annotates the result above it; a
+ * solid crimson block would read as a fourth money figure.
+ */
+function AdversaryCaption({ note }: { note: AdversaryNote }) {
+  const { reroutedTransfers, recoveryShare, passiveRecoveryShare } = note
+  return (
+    <p
+      className="mt-2.5 px-2 py-1 rounded-[2px] text-[12.5px] text-paper-text/75 leading-snug"
+      style={{ border: '1px solid rgba(200, 68, 62, 0.5)' }}
+    >
+      <span className="font-mono tabular-nums text-paper-text">
+        {count(reroutedTransfers)}
+      </span>{' '}
+      {reroutedTransfers === 1 ? 'transfer' : 'transfers'} rerouted
+      {passiveRecoveryShare !== null && (
+        <>
+          {' · recovery '}
+          <span className="font-mono tabular-nums text-paper-text">
+            {percent(passiveRecoveryShare, 0)}
+          </span>
+          {' → '}
+          <span className="font-mono tabular-nums text-burn">
+            {percent(recoveryShare, 0)}
+          </span>
+        </>
+      )}
+    </p>
+  )
 }
 
 function Column({
@@ -125,6 +175,7 @@ export default function SplitCompare({
   amountInr,
   innocentFrozen,
   baselineInnocentFrozen,
+  adversary,
   dense = false,
 }: Props) {
   if (!frame || !header) {
@@ -197,6 +248,7 @@ export default function SplitCompare({
             frozen={frame.frozen.length}
             amount={amountInr}
           />
+          {adversary && <AdversaryCaption note={adversary} />}
         </div>
       </div>
 

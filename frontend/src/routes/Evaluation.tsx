@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Loader2 } from 'lucide-react'
 import { api } from '@/api/client'
+import { RouteError, RouteLoading } from '@/components/layout/RouteState'
 import {
   DelayCurve,
   InnocenceCurve,
@@ -18,20 +18,6 @@ import { count, percent, rupeesCompact } from '@/lib/format'
  * generated on request, so what is on screen is always a run someone can
  * reproduce.
  */
-
-function Missing({ message }: { message: string }) {
-  return (
-    <div className="panel p-6 max-w-xl">
-      <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle size={16} className="text-hi" aria-hidden />
-        <h2 className="font-display text-base text-hi tracking-display">
-          Not generated yet
-        </h2>
-      </div>
-      <p className="text-[15.5px] text-lo leading-relaxed">{message}</p>
-    </div>
-  )
-}
 
 function Panel({
   title,
@@ -64,22 +50,11 @@ export default function Evaluation() {
   const detector = useQuery({ queryKey: ['detector'], queryFn: api.detector })
 
   if (benchmark.isPending) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <span className="flex items-center gap-2 text-[15.5px] text-lo">
-          <Loader2 size={14} className="animate-spin" aria-hidden />
-          Loading the benchmark…
-        </span>
-      </div>
-    )
+    return <RouteLoading label="Loading the benchmark…" />
   }
 
   if (benchmark.error) {
-    return (
-      <div className="p-6">
-        <Missing message={(benchmark.error as Error).message} />
-      </div>
-    )
+    return <RouteError error={benchmark.error} subject="the benchmark" />
   }
 
   const data = benchmark.data!

@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss'
-import { tokens } from './src/theme/tokens'
+import { institution, tokens } from './src/theme/tokens'
 
 /**
  * Mirrors src/theme/tokens.ts. Tokens are defined once there and imported here
@@ -25,6 +25,16 @@ export default {
         burn: tokens.burn,
         hi: tokens.textHi,
         lo: tokens.textLo,
+        // Portal chrome. Namespaced so a `bg-navy` can never be typed by
+        // accident on the canvas -- you have to ask for `institution-*`.
+        institution: {
+          navy: institution.navy,
+          deep: institution.navyDeep,
+          steel: institution.steel,
+          rule: institution.rule,
+          on: institution.onNavy,
+          lo: institution.onNavyLo,
+        },
       },
       fontFamily: {
         display: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],

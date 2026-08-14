@@ -368,12 +368,18 @@ def _residence_features(
     if credits.height == 0 or debits.height == 0:
         return
 
+    # Both frames are sorted by their join key above, and a subsequence of a
+    # sorted sequence is sorted -- so every `account` group is sorted too.
+    # Polars cannot verify that cheaply once `by` groups are involved and warns
+    # on every call; the hint says we have already established it. Without it
+    # the warning prints on every request and clutters the demo terminal.
     matched = debits.join_asof(
         credits,
         left_on="debit_epoch",
         right_on="credit_epoch",
         by="account",
         strategy="backward",
+        check_sortedness=False,
     ).drop_nulls("credit_epoch")
     if matched.height == 0:
         return
