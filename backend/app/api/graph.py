@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.graphstore.build import (
     DatasetMissingError,
@@ -31,12 +32,16 @@ class NodeOut(BaseModel):
     first_seen_minute: int
     amount_in: float
     amount_out: float
+    tainted_in: float
 
 
 class LinkOut(BaseModel):
     source: str
     target: str
     amount: float
+    tainted: float = Field(
+        description="How much of this transfer was the victim's money."
+    )
     minute: int
     channel: str
     is_fraud: bool
@@ -84,13 +89,18 @@ def get_graph(scenario_id: str) -> GraphOut:
         incident_time=graph.incident_time,
         horizon_minutes=graph.horizon_minutes,
         # Fixed layout seed: the graph must settle identically every run so the
-        # demo looks the same on stage as it did in rehearsal.
-        layout_seed=abs(hash(scenario_id)) % 100_000,
+        # demo looks the same on stage as it did in rehearsal. `hash()` on a str
+        # is salted per process, so it is useless here -- the digest is stable.
+        layout_seed=_stable_seed(scenario_id),
         truncated=graph.truncated,
         fraud_flow_inr=round(graph.total_laundered, 2),
         nodes=[NodeOut(id=n.account_id, **_node_fields(n)) for n in graph.nodes],
         links=[LinkOut(**vars(link)) for link in graph.links],
     )
+
+
+def _stable_seed(text: str) -> int:
+    return int(hashlib.sha256(text.encode()).hexdigest()[:8], 16) % 100_000
 
 
 def _node_fields(node: object) -> dict[str, object]:

@@ -8,14 +8,17 @@
 
 .EXAMPLE
     .\run.ps1 setup      # install backend + frontend dependencies
-    .\run.ps1 data       # generate the synthetic transaction dataset
-    .\run.ps1 train      # train the detectors
+    .\run.ps1 data       # generate the synthetic transaction dataset (~2s)
+    .\run.ps1 train      # train the detection tiers (~4 min)
+    .\run.ps1 bench      # run the 200-incident benchmark (~45 min, optional)
+    .\run.ps1 all        # data + train, everything the demo needs
     .\run.ps1 test       # run the backend test suite
     .\run.ps1 dev        # start backend and frontend together
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('setup', 'data', 'train', 'test', 'dev', 'backend', 'frontend', 'clean')]
+    [ValidateSet('setup', 'data', 'train', 'bench', 'all', 'test', 'dev',
+                 'backend', 'frontend', 'clean')]
     [string]$Task = 'dev'
 )
 
@@ -44,6 +47,20 @@ switch ($Task) {
 
     'train' {
         Invoke-In $backend { python -m app.detect.train }
+    }
+
+    'bench' {
+        Invoke-In $backend { python -m app.eval.harness }
+    }
+
+    'all' {
+        # Everything the demo needs, in order. The benchmark is deliberately
+        # excluded -- it takes 45 minutes and the console runs without it.
+        Invoke-In $backend {
+            python -m app.simulator.generator
+            python -m app.detect.train
+        }
+        Write-Host 'Ready. Run: .\run.ps1 dev' -ForegroundColor Green
     }
 
     'test' {

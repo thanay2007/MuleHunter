@@ -23,6 +23,7 @@ from functools import lru_cache
 import polars as pl
 
 from app.config import settings
+from app.simulator.population import EPOCH_REF
 from app.simulator.scenarios import SCENARIOS_BY_ID, Scenario
 
 log = logging.getLogger(__name__)
@@ -39,10 +40,15 @@ class Dataset:
     accounts: pl.DataFrame
     transactions: pl.DataFrame
     labels: pl.DataFrame
+    episodes: pl.DataFrame
 
     @property
     def account_index(self) -> dict[str, dict[str, object]]:
         return _account_index(self)
+
+    @property
+    def mule_ids(self) -> frozenset[str]:
+        return _mule_ids(self)
 
 
 @lru_cache(maxsize=1)
@@ -50,7 +56,12 @@ def load_dataset() -> Dataset:
     """Load the generated parquet artifacts. Cached for the process lifetime."""
     missing = [
         p.name
-        for p in (settings.accounts_path, settings.transactions_path, settings.labels_path)
+        for p in (
+            settings.accounts_path,
+            settings.transactions_path,
+            settings.labels_path,
+            settings.episodes_path,
+        )
         if not p.exists()
     ]
     if missing:
@@ -62,6 +73,7 @@ def load_dataset() -> Dataset:
         accounts=pl.read_parquet(settings.accounts_path),
         transactions=pl.read_parquet(settings.transactions_path),
         labels=pl.read_parquet(settings.labels_path),
+        episodes=pl.read_parquet(settings.episodes_path),
     )
     log.info(
         "loaded %d accounts / %d transactions",
@@ -75,6 +87,14 @@ def load_dataset() -> Dataset:
 def _account_index(dataset: Dataset) -> dict[str, dict[str, object]]:
     joined = dataset.accounts.join(dataset.labels, on="account_id", how="left")
     return {row["account_id"]: row for row in joined.iter_rows(named=True)}
+
+
+@lru_cache(maxsize=1)
+def _mule_ids(dataset: Dataset) -> frozenset[str]:
+    """Ground truth. Used to *score* results, never to produce them."""
+    return frozenset(
+        dataset.labels.filter(pl.col("is_mule"))["account_id"].to_list()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -94,10 +114,12 @@ class GraphNode:
     layer_index: int
     is_cashout_node: bool
     exit_kind: str
-    depth: int  # hops from the victim
+    depth: int  # hops from the victim along the money's path
     first_seen_minute: int  # minutes after the incident
     amount_in: float
     amount_out: float
+    #: The victim's money that passed through this account.
+    tainted_in: float
 
 
 @dataclass
@@ -105,6 +127,9 @@ class GraphLink:
     source: str
     target: str
     amount: float
+    #: How much of this transfer was the victim's money. Zero for ordinary
+    #: traffic that merely happens to touch an account in the incident.
+    tainted: float
     minute: int
     channel: str
     is_fraud: bool
@@ -122,7 +147,8 @@ class IncidentGraph:
 
     @property
     def total_laundered(self) -> float:
-        return sum(link.amount for link in self.links if link.is_fraud)
+        """Value of this victim's money moving, counted once per hop."""
+        return sum(link.tainted for link in self.links)
 
 
 def _window(dataset: Dataset, start: datetime, end: datetime) -> pl.DataFrame:
@@ -134,18 +160,44 @@ def _window(dataset: Dataset, start: datetime, end: datetime) -> pl.DataFrame:
 def build_incident_graph(
     scenario_id: str, context_hops: int | None = None
 ) -> IncidentGraph:
-    """Slice the incident subgraph for a scenario out of the full dataset."""
+    """Slice the incident subgraph for a scenario out of the full dataset.
+
+    The graph is built from the **traced money**, not from every fraudulent
+    transfer in the window. Those are very different sets: the ring runs a
+    laundering episode every day or two, so a six-hour window around one
+    incident routinely contains other victims' money moving through the same
+    accounts. Drawing all of it produced a canvas full of long edges that had
+    nothing to do with the complaint on screen.
+
+    Tracing here uses the full horizon rather than stopping at the complaint,
+    because the canvas is a replay of what happened -- the *solver* is the part
+    that is restricted to what was visible at the complaint time.
+    """
     scenario = SCENARIOS_BY_ID.get(scenario_id)
     if scenario is None:
         raise KeyError(f"Unknown scenario {scenario_id!r}")
+
+    from app.graphstore.trace import trace_taint, transaction_index
 
     dataset = load_dataset()
     horizon = timedelta(hours=settings.incident_horizon_hours)
     start = scenario.incident_time
     end = start + horizon
 
+    state = trace_taint(
+        scenario.victim_account,
+        scenario.amount_inr,
+        start,
+        end,
+        transaction_index(),
+    )
+
     window = _window(dataset, start, end)
-    arrival, order = _temporal_reach(window, scenario.victim_account, start)
+    arrival = {
+        account: start + timedelta(seconds=epoch - state.t0)
+        for account, epoch in state.first_seen.items()
+    }
+    depth = _taint_depth(state, scenario.victim_account)
 
     core = set(arrival)
     if context_hops is None:
@@ -154,8 +206,32 @@ def build_incident_graph(
 
     keep = core | context
     edges = window.filter(pl.col("src").is_in(keep) & pl.col("dst").is_in(keep))
+    tainted = {
+        (flow.src, flow.dst, flow.epoch): flow.tainted for flow in state.flows
+    }
 
-    return _assemble(dataset, scenario, arrival, order, context, edges, start)
+    return _assemble(
+        dataset, scenario, arrival, depth, context, edges, start, state, tainted
+    )
+
+
+def _taint_depth(state, victim: str) -> dict[str, int]:
+    """Hops from the victim along the path the money actually took."""
+    children: dict[str, list[str]] = {}
+    for flow in sorted(state.flows, key=lambda f: f.epoch):
+        children.setdefault(flow.src, []).append(flow.dst)
+
+    depth = {victim: 0}
+    frontier = [victim]
+    while frontier:
+        nxt: list[str] = []
+        for node in frontier:
+            for child in children.get(node, ()):
+                if child not in depth:
+                    depth[child] = depth[node] + 1
+                    nxt.append(child)
+        frontier = nxt
+    return depth
 
 
 def _temporal_reach(
@@ -217,6 +293,8 @@ def _assemble(
     context: set[str],
     edges: pl.DataFrame,
     t0: datetime,
+    state: object,
+    tainted: dict[tuple[str, str, int], float],
 ) -> IncidentGraph:
     index = dataset.account_index
 
@@ -226,11 +304,20 @@ def _assemble(
 
     for row in edges.iter_rows(named=True):
         minute = int((row["timestamp"] - t0).total_seconds() // 60)
+        # Keyed on (src, dst, epoch) to match the traced flows exactly. Note
+        # `datetime.timestamp()` is never used -- it reads the machine's local
+        # timezone and would make this depend on where the code runs.
+        key = (
+            row["src"],
+            row["dst"],
+            int((row["timestamp"] - EPOCH_REF).total_seconds()),
+        )
         links.append(
             GraphLink(
                 source=row["src"],
                 target=row["dst"],
                 amount=float(row["amount"]),
+                tainted=round(tainted.get(key, 0.0), 2),
                 minute=minute,
                 channel=row["channel"],
                 is_fraud=bool(row["is_fraud"]),
@@ -276,6 +363,9 @@ def _assemble(
                 first_seen_minute=int((seen - t0).total_seconds() // 60) if seen else -1,
                 amount_in=round(flow_in.get(account_id, 0.0), 2),
                 amount_out=round(flow_out.get(account_id, 0.0), 2),
+                tainted_in=round(
+                    getattr(state, "through", {}).get(account_id, 0.0), 2
+                ),
             )
         )
 
@@ -296,84 +386,133 @@ def _assemble(
 
 
 def dataset_summary() -> dict[str, object]:
-    """Headline statistics for the dataset overview panel."""
-    dataset = load_dataset()
-    retail = dataset.accounts.filter(pl.col("archetype") != "exit_point")
-    mules = dataset.labels.filter(pl.col("is_mule"))
-    fraud = dataset.transactions.filter(pl.col("is_fraud"))
+    """Headline statistics for the dataset overview panel.
 
-    archetypes = (
-        retail.group_by("archetype").len().sort("len", descending=True).rows(named=True)
-    )
-    channels = (
-        dataset.transactions.group_by("channel")
-        .len()
-        .sort("len", descending=True)
-        .rows(named=True)
-    )
-    hourly = (
-        dataset.transactions.with_columns(pl.col("timestamp").dt.hour().alias("hour"))
-        .group_by("hour")
-        .len()
-        .sort("hour")
-        .rows(named=True)
-    )
+    Runs as SQL against the DuckDB warehouse. This is the division of labour
+    the project commits to: polars holds the hot path, where an incident is
+    sliced and scored inside a request, and DuckDB answers anything that scans
+    the whole dataset to produce a rollup. Doing full-table aggregates in
+    Python loops is what an embedded analytical database exists to avoid.
+    """
+    from app.graphstore import warehouse
 
+    try:
+        headline = warehouse.query(
+            """
+            SELECT
+              (SELECT count(*) FROM retail_accounts)                       AS accounts,
+              (SELECT count(*) FROM account_facts
+                 WHERE archetype = 'exit_point')                           AS exit_nodes,
+              (SELECT count(*) FROM transactions)                          AS transactions,
+              (SELECT count(*) FROM transactions WHERE is_fraud)           AS fraud_transactions,
+              (SELECT count(*) FROM retail_accounts WHERE is_mule)         AS mule_accounts,
+              (SELECT count(DISTINCT bank_id) FROM retail_accounts)        AS banks,
+              (SELECT count(DISTINCT district) FROM retail_accounts)       AS districts,
+              (SELECT coalesce(sum(amount), 0) FROM transactions
+                 WHERE is_fraud)                                           AS total_laundered_inr
+            """
+        )[0]
+        archetypes = warehouse.query(
+            "SELECT archetype AS name, count(*) AS count FROM retail_accounts "
+            "GROUP BY archetype ORDER BY count DESC"
+        )
+        channels = warehouse.query(
+            "SELECT channel AS name, count(*) AS count FROM transactions "
+            "GROUP BY channel ORDER BY count DESC"
+        )
+        hourly = warehouse.query(
+            "SELECT hour(timestamp) AS hour, count(*) AS count FROM transactions "
+            "GROUP BY 1 ORDER BY 1"
+        )
+    except warehouse.WarehouseMissingError as exc:
+        raise DatasetMissingError(str(exc)) from exc
+
+    accounts = int(headline["accounts"])
     return {
-        "accounts": retail.height,
-        "exit_nodes": dataset.accounts.height - retail.height,
-        "transactions": dataset.transactions.height,
-        "fraud_transactions": fraud.height,
-        "mule_accounts": mules.height,
-        "mule_prevalence": round(mules.height / retail.height, 5),
-        "banks": int(retail["bank_id"].n_unique()),
-        "districts": int(retail["district"].n_unique()),
-        "total_laundered_inr": round(float(fraud["amount"].sum()), 2),
-        "archetypes": [{"name": r["archetype"], "count": r["len"]} for r in archetypes],
-        "channels": [{"name": r["channel"], "count": r["len"]} for r in channels],
-        "hourly": [{"hour": r["hour"], "count": r["len"]} for r in hourly],
+        "accounts": accounts,
+        "exit_nodes": int(headline["exit_nodes"]),
+        "transactions": int(headline["transactions"]),
+        "fraud_transactions": int(headline["fraud_transactions"]),
+        "mule_accounts": int(headline["mule_accounts"]),
+        "mule_prevalence": round(int(headline["mule_accounts"]) / max(accounts, 1), 5),
+        "banks": int(headline["banks"]),
+        "districts": int(headline["districts"]),
+        "total_laundered_inr": round(float(headline["total_laundered_inr"]), 2),
+        "archetypes": [
+            {"name": r["name"], "count": int(r["count"])} for r in archetypes
+        ],
+        "channels": [{"name": r["name"], "count": int(r["count"])} for r in channels],
+        "hourly": [
+            {"hour": int(r["hour"]), "count": int(r["count"])} for r in hourly
+        ],
     }
 
 
 def ring_summaries() -> list[dict[str, object]]:
-    """Per-ring rollup: who they are, what they touch, how much moved."""
-    dataset = load_dataset()
-    joined = dataset.accounts.join(dataset.labels, on="account_id", how="inner")
-    mules = joined.filter(pl.col("is_mule"))
+    """Ground-truth per-ring rollup: who they are, what they touch, how much moved.
 
-    flows = (
-        dataset.transactions.filter(pl.col("is_fraud"))
-        .group_by("ring_id")
-        .agg(
-            pl.col("amount").sum().alias("total_flow"),
-            pl.len().alias("txn_count"),
+    Also a SQL rollup over the whole dataset, for the same reason as above.
+    These are the generator's labels, shown so the *discovered* rings in
+    `/api/rings/{scenario_id}` can be checked rather than taken on trust.
+    """
+    from app.graphstore import warehouse
+
+    try:
+        rows = warehouse.query(
+            """
+            WITH members AS (
+              SELECT ring_id,
+                     any_value(typology)                  AS typology,
+                     count(*)                             AS accounts,
+                     count(DISTINCT bank_id)              AS bank_count,
+                     count(DISTINCT district)             AS districts,
+                     count(DISTINCT device_fingerprint)   AS device_clusters,
+                     max(layer_index)                     AS max_layer,
+                     count(*) FILTER (WHERE is_cashout_node) AS cashout_nodes,
+                     -- Median days of silence before the incident window. The
+                     -- rented-account tell, as a number per ring.
+                     median(date_diff('day', prior_activity_date, ?::DATE))
+                                                          AS dormancy_days
+              FROM retail_accounts
+              WHERE is_mule
+              GROUP BY ring_id
+            ),
+            flows AS (
+              SELECT ring_id, sum(amount) AS total_flow, count(*) AS txn_count
+              FROM transactions WHERE is_fraud GROUP BY ring_id
+            )
+            SELECT m.*,
+                   coalesce(f.total_flow, 0) AS total_flow_inr,
+                   coalesce(f.txn_count, 0)  AS txn_count
+            FROM members m LEFT JOIN flows f USING (ring_id)
+            ORDER BY m.ring_id
+            """,
+            [settings.sim_end_date],
         )
-    )
-    flow_by_ring = {r["ring_id"]: r for r in flows.rows(named=True)}
-
-    summaries: list[dict[str, object]] = []
-    for ring_id in sorted(mules["ring_id"].unique().to_list()):
-        members = mules.filter(pl.col("ring_id") == ring_id)
-        flow = flow_by_ring.get(ring_id, {"total_flow": 0.0, "txn_count": 0})
-
-        cashout = members.filter(pl.col("is_cashout_node"))
-        summaries.append(
-            {
-                "ring_id": ring_id,
-                "typology": str(members["typology"][0]),
-                "accounts": members.height,
-                "banks": sorted(members["bank_id"].unique().to_list()),
-                "districts": int(members["district"].n_unique()),
-                "device_clusters": int(members["device_fingerprint"].n_unique()),
-                "max_layer": int(members["layer_index"].max()),
-                "cashout_nodes": cashout.height,
-                "total_flow_inr": round(float(flow["total_flow"]), 2),
-                "txn_count": int(flow["txn_count"]),
-                "dormancy_days": int(
-                    (
-                        members["open_date"].max() - members["open_date"].min()
-                    ).days
-                ),
-            }
+        banks = warehouse.query(
+            "SELECT ring_id, bank_id FROM retail_accounts WHERE is_mule "
+            "GROUP BY ring_id, bank_id ORDER BY ring_id, bank_id"
         )
-    return summaries
+    except warehouse.WarehouseMissingError as exc:
+        raise DatasetMissingError(str(exc)) from exc
+
+    banks_by_ring: dict[str, list[str]] = {}
+    for row in banks:
+        banks_by_ring.setdefault(str(row["ring_id"]), []).append(str(row["bank_id"]))
+
+    return [
+        {
+            "ring_id": str(row["ring_id"]),
+            "typology": str(row["typology"]),
+            "accounts": int(row["accounts"]),
+            "banks": banks_by_ring.get(str(row["ring_id"]), []),
+            "districts": int(row["districts"]),
+            "device_clusters": int(row["device_clusters"]),
+            "max_layer": int(row["max_layer"]),
+            "cashout_nodes": int(row["cashout_nodes"]),
+            "total_flow_inr": round(float(row["total_flow_inr"]), 2),
+            "txn_count": int(row["txn_count"]),
+            "dormancy_days": int(row["dormancy_days"] or 0),
+        }
+        for row in rows
+    ]

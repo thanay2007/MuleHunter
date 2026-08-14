@@ -5,6 +5,7 @@ Run with:  uvicorn app.main:app --reload --port 8000   (from `backend/`)
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -12,7 +13,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import graph, health, scenarios
+from app.api import (
+    account,
+    evaluate,
+    graph,
+    health,
+    interdict,
+    scenarios,
+    session,
+    ws_replay,
+)
 from app.config import settings
 
 logging.basicConfig(
@@ -25,13 +35,19 @@ logging.basicConfig(
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.models_dir.mkdir(parents=True, exist_ok=True)
-    logging.getLogger(__name__).info(
+    log = logging.getLogger(__name__)
+    log.info(
         "chakravyuh v%s (phase %d) ready on %s:%d",
         settings.version,
         settings.phase,
         settings.host,
         settings.port,
     )
+
+    # Build the stage scenario's context off the request path. Tracing,
+    # featurising and rolling out an incident takes a couple of seconds, and
+    # the first click of a demo is not the moment to spend them.
+    await asyncio.to_thread(session.warm, "S1")
     yield
 
 
@@ -57,8 +73,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(scenarios.router, prefix="/api", tags=["scenarios"])
 app.include_router(graph.router, prefix="/api", tags=["graph"])
-
-# Routers added as each phase lands:
-#   phase 4:   interdict
-#   phase 5:   ws_replay
-#   phase 6:   evaluate
+app.include_router(interdict.router, prefix="/api", tags=["interdict"])
+app.include_router(account.router, prefix="/api", tags=["inspect"])
+app.include_router(evaluate.router, prefix="/api", tags=["evaluate"])
+app.include_router(ws_replay.router, tags=["replay"])

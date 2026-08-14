@@ -11,6 +11,7 @@ import { api } from '@/api/client'
 const TABS = [
   { to: '/', label: 'Operations', end: true },
   { to: '/rings', label: 'Rings' },
+  { to: '/evaluation', label: 'Evaluation' },
   { to: '/data', label: 'Data' },
 ] as const
 

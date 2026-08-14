@@ -16,6 +16,8 @@ env/
 node_modules/
 frontend/dist/
 .vite/
+# TypeScript incremental build cache -- machine-local, rewritten on every build.
+*.tsbuildinfo
 
 # Editor / OS
 .DS_Store
@@ -26,3 +28,7 @@ Thumbs.db
 
 # Local overrides
 .env
+
+# Browser automation scratch output
+.playwright-mcp/
+*.png

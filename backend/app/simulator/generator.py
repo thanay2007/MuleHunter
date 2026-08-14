@@ -49,6 +49,7 @@ class GeneratedDataset:
     accounts: pl.DataFrame
     transactions: pl.DataFrame
     labels: pl.DataFrame
+    episodes: pl.DataFrame
     rings: list[Ring]
     out_dir: Path
     elapsed_seconds: float
@@ -71,21 +72,30 @@ def generate_dataset(out_dir: Path | None = None, seed: int | None = None) -> Ge
 
     accounts, rings, active = inject_rings(np.random.default_rng(ring_seed), accounts)
 
-    background = build_background_transactions(
-        np.random.default_rng(traffic_seed), accounts, exit_nodes, active
-    )
-
+    # Episodes are scheduled before background traffic, because a mule account
+    # is dormant until its ring first uses it and then behaves like an ordinary
+    # account around the laundering runs. The traffic generator needs to know
+    # that activation day to place -- and withhold -- ordinary activity.
     episode_rng = np.random.default_rng(episode_seed)
     account_ids = accounts["account_id"].to_list()
     build_episodes(episode_rng, rings, account_ids, active)
+
+    background = build_background_transactions(
+        np.random.default_rng(traffic_seed),
+        accounts,
+        exit_nodes,
+        active,
+        _activation_days(rings, accounts.height),
+    )
 
     fraud_rows = _run_all_episodes(episode_rng, rings, accounts, exit_nodes)
 
     transactions = _finalise_transactions(background, fraud_rows)
     labels = _build_labels(accounts, rings)
     nodes = _combine_nodes(accounts, exit_nodes)
+    episodes = _build_episodes_frame(rings)
 
-    _write(out, nodes, transactions, labels, rings)
+    _write(out, nodes, transactions, labels, episodes, rings)
 
     elapsed = time.perf_counter() - started
     log.info(
@@ -100,10 +110,32 @@ def generate_dataset(out_dir: Path | None = None, seed: int | None = None) -> Ge
         accounts=nodes,
         transactions=transactions,
         labels=labels,
+        episodes=episodes,
         rings=rings,
         out_dir=out,
         elapsed_seconds=elapsed,
     )
+
+
+def _activation_days(rings: list[Ring], n_accounts: int) -> np.ndarray:
+    """First day of the window on which each account may transact at all.
+
+    Zero for everyone except mules, who are dormant until their ring's first
+    laundering run. Returning this as a plain array keeps the traffic generator
+    fully vectorised.
+    """
+    start, _ = window_bounds()
+    live = np.zeros(n_accounts, dtype=np.int64)
+
+    for ring in rings:
+        if not ring.episodes:
+            continue
+        first = min(e.start_time.date() for e in ring.episodes)
+        day = max(0, (first - start).days)
+        for index in ring.member_indices:
+            live[index] = day
+
+    return live
 
 
 def _run_all_episodes(
@@ -125,16 +157,46 @@ def _run_all_episodes(
         if s.secondary_ring_id is not None
     }
 
+    legit_pool = _legit_payee_pool(accounts)
+
     rows: list[dict[str, object]] = []
     for ring in rings:
         for episode in ring.episodes:
             bridge = bridge_for.get(ring.ring_id) if episode.scenario_id else None
             rows.extend(
                 simulate_episode(
-                    rng, ring, episode, account_ids, exit_nodes, devices, ips, bridge
+                    rng,
+                    ring,
+                    episode,
+                    account_ids,
+                    exit_nodes,
+                    devices,
+                    ips,
+                    bridge,
+                    legit_pool,
                 )
             )
     return rows
+
+
+def _legit_payee_pool(accounts: pl.DataFrame) -> np.ndarray:
+    """Real businesses a laundering hop might plausibly pay.
+
+    Weighted to merchants and high-velocity traders, because that is who takes
+    a large payment from a stranger without blinking. These accounts are wholly
+    innocent and are labelled as such -- they exist to make the false-positive
+    cost of freezing real.
+    """
+    from app.simulator.scenarios import RESERVED_VICTIM_SLOTS
+
+    archetypes = accounts["archetype"].to_numpy()
+    eligible = np.flatnonzero(
+        (archetypes == "small_merchant") | (archetypes == "legit_high_velocity")
+    )
+    # Neither archetype is ever recruited as a mule (see RECRUIT_POOL), so
+    # every account here is innocent by construction. Scenario victims are
+    # excluded so a victim never receives their own laundered money.
+    return eligible[eligible >= RESERVED_VICTIM_SLOTS].astype(np.int64)
 
 
 def _finalise_transactions(
@@ -186,6 +248,30 @@ def _build_labels(accounts: pl.DataFrame, rings: list[Ring]) -> pl.DataFrame:
     )
 
 
+def _build_episodes_frame(rings: list[Ring]) -> pl.DataFrame:
+    """Every laundering run, as a first-class artifact.
+
+    The evaluation harness needs a catalogue of incidents to benchmark over.
+    Recovering one by inferring which fraud transfers look like episode roots
+    would work today and break the first time the typologies change, so the
+    generator writes down what it actually did.
+    """
+    rows = [
+        {
+            "episode_id": episode.episode_id,
+            "ring_id": ring.ring_id,
+            "typology": ring.typology,
+            "victim_account": episode.victim_account,
+            "amount_inr": episode.amount_inr,
+            "start_time": episode.start_time,
+            "scenario_id": episode.scenario_id or "",
+        }
+        for ring in rings
+        for episode in ring.episodes
+    ]
+    return pl.DataFrame(rows).sort("start_time", "episode_id")
+
+
 def _combine_nodes(accounts: pl.DataFrame, exit_nodes: pl.DataFrame) -> pl.DataFrame:
     retail = accounts.with_columns(pl.lit("").alias("exit_kind"))
     return pl.concat([retail, exit_nodes.select(retail.columns)], how="vertical")
@@ -196,6 +282,7 @@ def _write(
     nodes: pl.DataFrame,
     transactions: pl.DataFrame,
     labels: pl.DataFrame,
+    episodes: pl.DataFrame,
     rings: list[Ring],
 ) -> None:
     # zstd at a fixed level keeps the encoder deterministic run to run.
@@ -204,6 +291,9 @@ def _write(
         out / "transactions.parquet", compression="zstd", compression_level=3
     )
     labels.write_parquet(out / "labels.parquet", compression="zstd", compression_level=3)
+    episodes.write_parquet(
+        out / "episodes.parquet", compression="zstd", compression_level=3
+    )
     (out / "summary.md").write_text(
         _summary(nodes, transactions, labels, rings), encoding="utf-8"
     )
