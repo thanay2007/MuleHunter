@@ -47,7 +47,7 @@ export default function RingCard({ ring }: { ring: DiscoveredRing }) {
 
       {ring.cashout_capacity_inr > 0 && (
         <div className="flex justify-between text-[14px]">
-          <span className="text-lo">Reached cash-out</span>
+          <span className="text-lo">Cashed out</span>
           <span className="font-mono text-burn tabular-nums">
             {rupeesCompact(ring.cashout_capacity_inr)}
           </span>

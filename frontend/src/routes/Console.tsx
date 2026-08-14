@@ -25,10 +25,10 @@ const REPLAY_HORIZON_FALLBACK = 360
 function Legend() {
   const items = [
     { color: tokens.textHi, label: 'victim' },
-    { color: tokens.flow, label: 'money in motion' },
+    { color: tokens.flow, label: 'stolen money' },
     { color: tokens.interdict, label: 'frozen' },
-    { color: tokens.burn, label: 'cash-out' },
-    { color: tokens.textLo, label: 'ordinary account' },
+    { color: tokens.burn, label: 'money leaves' },
+    { color: tokens.textLo, label: 'normal account' },
   ]
   return (
     <div className="flex items-center gap-4 bg-ink/85 backdrop-blur-sm px-3 py-1.5 rounded-panel border border-ink-line">
@@ -56,7 +56,7 @@ function DatasetMissing({ message }: { message: string }) {
         <div className="flex items-center gap-2 mb-2">
           <AlertTriangle size={16} className="text-hi" aria-hidden />
           <h2 className="font-display text-base text-hi tracking-display">
-            No dataset to load
+            No data loaded
           </h2>
         </div>
         <p className="text-[15.5px] text-lo mb-3 leading-relaxed">{message}</p>
@@ -178,7 +178,7 @@ export default function Console() {
           bottom edge rather than becoming reachable. */}
       <aside className="w-[286px] shrink-0 border-r border-ink-line flex flex-col overflow-y-auto">
         <div className="px-4 pt-4 pb-3 shrink-0 max-h-[38%] overflow-y-auto">
-          <h2 className="label-lo mb-2">Incident</h2>
+          <h2 className="label-lo mb-2">Pick a case</h2>
           {scenariosQuery.data ? (
             <ScenarioPicker
               scenarios={scenariosQuery.data}
@@ -186,12 +186,12 @@ export default function Console() {
               onSelect={setScenario}
             />
           ) : (
-            <p className="text-[14px] text-lo">Loading incidents…</p>
+            <p className="text-[14px] text-lo">Loading cases…</p>
           )}
         </div>
 
         <div className="px-4 py-4 border-t border-ink-line shrink-0">
-          <h2 className="label-lo mb-3">Budgets</h2>
+          <h2 className="label-lo mb-3">Limits</h2>
           <BudgetControls />
         </div>
 
@@ -234,17 +234,17 @@ export default function Console() {
           {interdiction.data && (
             <dl className="mt-3 space-y-1.5">
               {[
-                ['Solved in', `${interdiction.data.solve_ms.toFixed(0)} ms`],
+                ['Time to solve', `${interdiction.data.solve_ms.toFixed(0)} ms`],
                 // Two different sets, deliberately named apart: the solver
                 // scores every account the money could reach, while the canvas
                 // draws only the ones it actually did.
-                ['Accounts scored', count(interdiction.data.candidates_considered)],
+                ['Accounts checked', count(interdiction.data.candidates_considered)],
                 [
-                  'On screen',
+                  'Shown here',
                   count(graphQuery.data?.nodes.length ?? 0),
                 ],
                 [
-                  'Rollouts',
+                  'Simulations',
                   `${count(interdiction.data.rollouts)} × ${count(
                     Math.round(
                       interdiction.data.particles / interdiction.data.rollouts,
@@ -265,7 +265,7 @@ export default function Console() {
             rail scrolls instead, which beats collapsing it to nothing. */}
         <div className="px-4 py-4 border-t border-ink-line flex-1 min-h-[190px] flex flex-col">
           <div className="flex items-baseline justify-between mb-2 shrink-0">
-            <h2 className="label-lo">Freeze queue</h2>
+            <h2 className="label-lo">Accounts to freeze</h2>
             {plan.length > 0 && (
               <span className="font-mono text-[13px] text-lo tabular-nums">
                 {count(plan.filter((s) => s.issue_at_minute <= minute).length)} /{' '}
@@ -303,7 +303,7 @@ export default function Console() {
                 </span>
               </>
             ) : (
-              <span className="text-[15.5px] text-lo">Pick a scenario to begin</span>
+              <span className="text-[15.5px] text-lo">Pick a case to begin</span>
             )}
           </div>
 
@@ -323,7 +323,7 @@ export default function Console() {
                   reported ? 'text-hi border-hi/40' : 'text-lo border-ink-line',
                 ].join(' ')}
               >
-                {reported ? 'complaint filed' : 'nobody knows yet'}
+                {reported ? 'reported' : 'not reported yet'}
               </span>
               <LayoutToggle />
             </div>
@@ -346,7 +346,7 @@ export default function Console() {
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="flex items-center gap-2 text-[15.5px] text-lo">
                 <Loader2 size={14} className="animate-spin" aria-hidden />
-                Tracing where the money went…
+                Following the money…
               </span>
             </div>
           )}
@@ -375,8 +375,8 @@ export default function Console() {
           {phase === 'idle' && graphQuery.data && (
             <div className="absolute inset-x-0 bottom-16 flex justify-center pointer-events-none">
               <p className="text-[14px] text-lo bg-ink/85 backdrop-blur-sm px-3 py-1.5 rounded-panel border border-ink-line">
-                Press <span className="text-hi">Run interdiction</span> to watch
-                the money move and the freezes land.
+                Press <span className="text-hi">Run interdiction</span> to watch the money
+                move and the freezes land.
               </p>
             </div>
           )}
@@ -427,7 +427,7 @@ export default function Console() {
               min={layout === 'side' ? 320 : 120}
               max={layout === 'side' ? 760 : Math.max(240, window.innerHeight - 300)}
               label={
-                layout === 'side' ? 'Resize the ledger dock' : 'Resize the ledger band'
+                layout === 'side' ? 'Resize the money panel' : 'Resize the money panel'
               }
             />
             <div
@@ -458,7 +458,7 @@ export default function Console() {
               />
             ) : (
               <div className="ledger px-6 py-8 text-center text-[15.5px] text-paper-text/60">
-                Pick a scenario to see where its money went.
+                Pick a case to see where its money went.
               </div>
             )}
             </div>

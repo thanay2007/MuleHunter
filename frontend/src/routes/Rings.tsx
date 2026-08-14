@@ -52,20 +52,20 @@ export default function Rings() {
       <div className="flex-1 min-w-0 overflow-y-auto p-5">
         <header className="mb-5">
           <h1 className="font-display text-lg text-hi tracking-display">
-            Rings found in this incident
+            Gangs found in this case
           </h1>
           <p className="text-[15px] text-lo mt-1.5 max-w-3xl leading-relaxed">
-            Communities recovered by Louvain over the accounts the detector
-            flagged, on a graph that combines transfer volume with shared-device
-            and shared-IP links. Nothing below uses the generator&rsquo;s
-            labels; the true rings are listed at the bottom for comparison.
+            Groups the system found on its own, by looking at who paid whom plus
+            which accounts share a phone or an internet connection. None of this
+            uses the answer key — the real gangs are listed at the bottom so you
+            can check the work.
           </p>
         </header>
 
         {discovered.isPending && (
           <p className="flex items-center gap-2 text-[15.5px] text-lo">
             <Loader2 size={14} className="animate-spin" aria-hidden />
-            Clustering…
+            Grouping accounts…
           </p>
         )}
 
@@ -77,9 +77,8 @@ export default function Rings() {
 
         {discovered.data && discovered.data.length === 0 && (
           <p className="text-[15.5px] text-lo max-w-xl leading-relaxed">
-            No community in this incident is large enough to call a ring. Try an
-            incident with a longer complaint delay, where more of the structure
-            has had time to appear.
+            No group in this case is big enough to call a gang. Try a case that
+            was reported later, where more of the pattern had time to show up.
           </p>
         )}
 
@@ -94,11 +93,11 @@ export default function Rings() {
         {truth.data && (
           <section className="mt-8 pt-5 border-t border-ink-line">
             <h2 className="font-display text-[17.5px] text-hi tracking-display">
-              Ground truth: what the generator actually injected
+              The answer key: the gangs we actually planted
             </h2>
             <p className="text-[14px] text-lo mt-1.5 mb-4 max-w-3xl leading-relaxed">
-              Twelve rings across four typologies. Shown so the discovery above
-              can be checked rather than taken on trust.
+              Twelve gangs of four different kinds. Shown so you can check the
+              results above instead of taking them on trust.
             </p>
 
             <div className="overflow-x-auto">
@@ -148,8 +147,7 @@ export default function Rings() {
               </table>
             </div>
             <p className="text-[13px] text-lo/70 mt-3">
-              {count(truth.data.reduce((sum, r) => sum + r.accounts, 0))} mule
-              accounts in total.
+              {count(truth.data.reduce((sum, r) => sum + r.accounts, 0))} mule accounts in total.
             </p>
           </section>
         )}

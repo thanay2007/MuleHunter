@@ -68,8 +68,8 @@ export default function BudgetControls() {
   return (
     <div className="space-y-4">
       <Slider
-        label="Freeze authority"
-        hint="How many freeze instructions may be issued for this incident."
+        label="Freezes allowed"
+        hint="The most accounts we may freeze for this case."
         value={budgetK}
         min={1}
         max={80}
@@ -78,8 +78,8 @@ export default function BudgetControls() {
         onChange={setBudgetK}
       />
       <Slider
-        label="Innocence budget"
-        hint="Total priced harm the plan may spend. Tighten it and the solver switches to gentler actions."
+        label="Harm limit"
+        hint="How much risk of freezing innocent people we accept. Lower it and the plan uses gentler actions."
         value={innocenceBudget}
         min={0.05}
         max={8}
@@ -97,10 +97,10 @@ export default function BudgetControls() {
         />
         <span>
           <span className="text-[14px] text-hi block leading-tight">
-            Adaptive adversary
+            Fraudster fights back
           </span>
           <span className="text-[13px] text-lo leading-snug block mt-0.5">
-            Assume the operator reroutes blocked money instead of giving up.
+            Assume they send money another way when we block a path.
           </span>
         </span>
       </label>

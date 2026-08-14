@@ -9,9 +9,9 @@ import { api } from '@/api/client'
  */
 
 const TABS = [
-  { to: '/', label: 'Operations', end: true },
+  { to: '/', label: 'Live case', end: true },
   { to: '/rings', label: 'Rings' },
-  { to: '/evaluation', label: 'Evaluation' },
+  { to: '/evaluation', label: 'Results' },
   { to: '/data', label: 'Data' },
 ] as const
 

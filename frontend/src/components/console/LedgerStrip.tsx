@@ -29,7 +29,7 @@ export default function LedgerStrip({ frame, amountInr, onExpand }: Props) {
         <>
           <div className="flex items-baseline gap-2 min-w-0">
             <span className="text-[12px] text-paper-text/55 shrink-0">
-              current practice
+              banks today
             </span>
             <span className="font-mono tabular-nums text-[15.5px] text-interdict">
               {rupees(theirs)}
@@ -57,7 +57,7 @@ export default function LedgerStrip({ frame, amountInr, onExpand }: Props) {
             className="flex-1 min-w-[80px] h-2 rounded-full overflow-hidden flex"
             style={{ boxShadow: 'inset 0 0 0 1px rgba(42, 38, 32, 0.14)' }}
             role="img"
-            aria-label={`${percent(keptShare, 0)} of the stolen amount still inside the banking system`}
+            aria-label={`${percent(keptShare, 0)} of the stolen money still saved`}
           >
             <div
               className="h-full bg-interdict transition-[width] duration-150 ease-linear"
@@ -68,7 +68,7 @@ export default function LedgerStrip({ frame, amountInr, onExpand }: Props) {
         </>
       ) : (
         <span className="flex-1 text-[13px] text-paper-text/55">
-          Run the interdiction to compare current practice against Chakravyuh.
+          Run it to compare how banks work today against Chakravyuh.
         </span>
       )}
 
@@ -78,7 +78,7 @@ export default function LedgerStrip({ frame, amountInr, onExpand }: Props) {
         className="shrink-0 flex items-center gap-1.5 text-[12px] text-paper-text/60 hover:text-paper-text transition-colors"
       >
         <ChevronUp size={13} strokeWidth={2} aria-hidden />
-        Show ledger
+        Show details
       </button>
     </div>
   )

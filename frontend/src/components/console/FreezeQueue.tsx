@@ -21,17 +21,17 @@ const ACTION_META: Record<
   full_freeze: {
     label: 'Full freeze',
     icon: Snowflake,
-    hint: 'All movement blocked',
+    hint: 'Nothing moves in or out',
   },
   outbound_hold: {
     label: 'Outbound hold',
     icon: ShieldAlert,
-    hint: 'Credits allowed, debits blocked',
+    hint: 'Money can come in, but not go out',
   },
   step_up_verification: {
-    label: 'Step-up check',
+    label: 'Extra ID check',
     icon: UserCheck,
-    hint: 'Re-verify before any debit clears',
+    hint: 'Prove who you are before money leaves',
   },
 }
 
@@ -51,8 +51,7 @@ export default function FreezeQueue({
   if (plan.length === 0) {
     return (
       <p className="text-[14px] text-lo leading-relaxed">
-        No plan yet. Run the interdiction to see which accounts to freeze, and
-        in what order.
+        No plan yet. Run it to see which accounts to freeze, and in what order.
       </p>
     )
   }

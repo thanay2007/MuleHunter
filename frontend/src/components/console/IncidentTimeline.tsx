@@ -97,7 +97,7 @@ export default function IncidentTimeline({
     <div className="px-5 py-3">
       <div className="flex items-baseline justify-between gap-4 mb-2">
         <div className="flex items-baseline gap-3">
-          <span className="label-lo">Response window</span>
+          <span className="label-lo">Timeline</span>
           {status === 'streaming' && (
             <span className="flex items-center gap-1.5 text-[13px] text-lo">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-hi animate-pulse" />
@@ -105,7 +105,7 @@ export default function IncidentTimeline({
             </span>
           )}
           {status === 'done' && (
-            <span className="text-[13px] text-lo">replay complete</span>
+            <span className="text-[13px] text-lo">finished</span>
           )}
         </div>
 
@@ -145,7 +145,7 @@ export default function IncidentTimeline({
             transform: anchor(complaintAt),
           }}
         >
-          complaint filed
+          victim reports it
         </span>
 
         {/* freeze instructions */}
@@ -200,11 +200,11 @@ export default function IncidentTimeline({
       {totalFreezes > 0 && (
         <p className="text-[13px] text-lo mt-1 leading-relaxed">
           <span className="inline-block w-[3px] h-2.5 rounded-full bg-interdict align-middle mr-1.5" />
-          {totalFreezes} freeze {totalFreezes === 1 ? 'instruction' : 'instructions'},
-          the first at {elapsed(freezeTicks[0]!.at)}
+          {totalFreezes} {totalFreezes === 1 ? 'freeze' : 'freezes'}, the first at{' '}
+          {elapsed(freezeTicks[0]!.at)}
           {complaintMinute > 0 && (
-            <> — nothing could be issued for the first {duration(complaintMinute)},
-            because nobody had reported it yet</>
+            <> — nothing could be done for {duration(complaintMinute)}, because
+            nobody had reported it yet</>
           )}
         </p>
       )}

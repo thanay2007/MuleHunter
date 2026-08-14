@@ -55,7 +55,7 @@ export default function DataRoute() {
     <div className="h-full overflow-y-auto p-5">
       <header className="mb-5">
         <h1 className="font-display text-lg text-hi tracking-display">
-          The dataset is synthetic
+          All this data is made up
         </h1>
         <p className="text-[15.5px] text-lo mt-1 max-w-3xl leading-relaxed">
           No real bank data, no real PII, no real account numbers. The generator is
@@ -67,10 +67,10 @@ export default function DataRoute() {
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
-        <Stat value={count(data.accounts)} label="Retail accounts" />
+        <Stat value={count(data.accounts)} label="Everyday accounts" />
         <Stat value={count(data.transactions)} label="Transactions" />
         <Stat value={count(data.mule_accounts)} label="Mule accounts" />
-        <Stat value={percent(data.mule_prevalence, 2)} label="Mule prevalence" />
+        <Stat value={percent(data.mule_prevalence, 2)} label="Share that are mules" />
         <Stat value={String(data.banks)} label="Banks" />
         <Stat value={String(data.districts)} label="Districts" />
       </div>
@@ -78,7 +78,7 @@ export default function DataRoute() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <section className="panel p-4">
           <h2 className="font-display text-[16.5px] text-hi tracking-display mb-1">
-            Activity by hour of day
+            When people pay, by hour
           </h2>
           <p className="text-[13.5px] text-lo mb-3">
             Peaks near 11:00 and 20:00 IST, matching the reported intraday UPI shape.
@@ -109,7 +109,7 @@ export default function DataRoute() {
 
         <section className="panel p-4">
           <h2 className="font-display text-[16.5px] text-hi tracking-display mb-1">
-            Account archetypes
+            Kinds of account
           </h2>
           <p className="text-[13.5px] text-lo mb-3">
             The highlighted bar is the hard-negative class: legitimate high-velocity
@@ -153,7 +153,7 @@ export default function DataRoute() {
 
       <section className="panel p-4 mt-3">
         <h2 className="font-display text-[16.5px] text-hi tracking-display mb-3">
-          Channel mix
+          How money moves
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {data.channels.map((channel) => (

@@ -70,7 +70,7 @@ function Column({
         className="text-[33.5px] leading-none block text-interdict"
       />
       <div className="text-[13px] text-paper-text/55 mt-2">
-        kept inside the banking system
+        saved — still in the bank
       </div>
 
       {/* The drain: teal is what was kept, crimson what was not. */}
@@ -78,7 +78,7 @@ function Column({
         className="mt-2.5 h-2.5 w-full rounded-full overflow-hidden flex"
         style={{ boxShadow: 'inset 0 0 0 1px rgba(42, 38, 32, 0.14)' }}
         role="img"
-        aria-label={`${percent(keptShare, 0)} kept, ${percent(lostShare, 0)} gone`}
+        aria-label={`${percent(keptShare, 0)} saved, ${percent(lostShare, 0)} lost`}
       >
         <div
           className="h-full bg-interdict transition-[width] duration-150 ease-linear"
@@ -92,7 +92,7 @@ function Column({
           {rupees(leaked)}
         </span>
         <span className="text-[13px] text-paper-text/55">
-          gone — {percent(lostShare, 0)} of the theft
+          lost — {percent(lostShare, 0)} of the total
         </span>
       </div>
 
@@ -131,7 +131,7 @@ export default function SplitCompare({
     return (
       <div className="ledger px-6 py-9 text-center">
         <p className="text-[15.5px] text-paper-text/55">
-          Run the interdiction to compare current practice against Chakravyuh.
+          Run it to compare how banks work today against Chakravyuh.
         </p>
       </div>
     )
@@ -155,7 +155,7 @@ export default function SplitCompare({
         style={{ borderBottom: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
         <h2 className="font-display text-[16.5px] text-paper-text tracking-display">
-          Incident ledger
+          Where the money ended up
         </h2>
         <span className="text-[12.5px] text-paper-text/50">
           <span className="font-mono tabular-nums text-paper-text/70">
@@ -165,14 +165,14 @@ export default function SplitCompare({
           <span className="font-mono tabular-nums text-paper-text/70">
             {elapsed(frame.minute)}
           </span>{' '}
-          into the incident
+          in
         </span>
       </div>
 
       <div className={dense ? 'flex flex-col gap-6' : 'grid grid-cols-2 gap-12'}>
         <Column
           title="Current practice"
-          subtitle="freeze the named account"
+          subtitle="freezes one account"
           leaked={frame.baseline.leaked_inr}
           saved={theirs}
           innocent={baselineInnocentFrozen}
@@ -190,7 +190,7 @@ export default function SplitCompare({
           />
           <Column
             title="Chakravyuh"
-            subtitle="freeze frontier"
+            subtitle="freezes the best set"
             leaked={frame.leaked_inr}
             saved={ours}
             innocent={innocentFrozen}
@@ -210,8 +210,7 @@ export default function SplitCompare({
       >
         {!anythingLost ? (
           <p className="text-[15px] text-paper-text/70 leading-relaxed">
-            Nothing has left the banking system yet — every rupee is still
-            recoverable on both sides.
+            No money has left the banks yet. All of it can still be saved.
           </p>
         ) : gap > 0 ? (
           <>
@@ -224,7 +223,7 @@ export default function SplitCompare({
                   {multiple.toFixed(1)}×
                 </div>
                 <div className="text-[11px] text-paper-text/50 mt-1.5 tracking-wide">
-                  more money kept
+                  more saved
                 </div>
               </div>
             )}
@@ -232,26 +231,25 @@ export default function SplitCompare({
               <span className="font-mono tabular-nums text-paper-text">
                 {rupees(gap)}
               </span>{' '}
-              more of this victim&rsquo;s money is still inside the banking system and
-              can be returned to them
+              more of the victim&rsquo;s money is saved and can be given back
               {extraInnocent === 0 ? (
                 <>
                   , with{' '}
                   <span className="text-paper-text">
-                    no additional innocent accounts frozen
+                    no extra innocent accounts frozen
                   </span>
                 </>
               ) : extraInnocent > 0 ? (
                 <>
-                  , at the cost of{' '}
+                  , but it froze{' '}
                   <span className="font-mono tabular-nums text-burn">
                     {count(extraInnocent)}
                   </span>{' '}
-                  more innocent {extraInnocent === 1 ? 'account' : 'accounts'} frozen
+                  more innocent {extraInnocent === 1 ? 'account' : 'accounts'}
                 </>
               ) : (
                 <>
-                  , while freezing{' '}
+                  , and it froze{' '}
                   <span className="font-mono tabular-nums text-paper-text">
                     {count(-extraInnocent)}
                   </span>{' '}
@@ -263,8 +261,7 @@ export default function SplitCompare({
           </>
         ) : (
           <p className="text-[15px] text-paper-text/70 leading-relaxed">
-            No advantage on this incident — the money was already gone before anyone
-            could act.
+            No gain here — the money was gone before anyone could act.
           </p>
         )}
       </div>
