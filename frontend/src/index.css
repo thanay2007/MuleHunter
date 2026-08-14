@@ -47,6 +47,53 @@
     outline: 1px solid theme('colors.hi');
     outline-offset: 2px;
   }
+
+  /* Scrollbars belong to the console, not to the operating system. The default
+     Windows bar is a wide light-grey slab that sits on a dark panel like a
+     foreign object, and there are several scroll areas on this screen at once.
+     Firefox takes the two-property form; the rest go through ::-webkit-*. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.ink.line') transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* The transparent border plus content-box clipping is what makes the thumb
+     read as a slim 4px pill with breathing room, rather than filling the
+     full gutter width. */
+  ::-webkit-scrollbar-thumb {
+    background-color: theme('colors.ink.line');
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: theme('colors.lo');
+  }
+
+  /* Scroll areas that sit on ledger paper need a warm thumb instead, or a cold
+     navy one appears on cream. */
+  .on-paper {
+    scrollbar-color: theme('colors.paper.line') transparent;
+  }
+
+  .on-paper::-webkit-scrollbar-thumb {
+    background-color: theme('colors.paper.line');
+  }
+
+  .on-paper::-webkit-scrollbar-thumb:hover {
+    background-color: theme('colors.paper.text');
+  }
 }
 
 @layer components {
