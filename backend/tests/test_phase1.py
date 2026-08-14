@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from datetime import timedelta
 from pathlib import Path
 
 import polars as pl
@@ -47,10 +48,16 @@ def test_generates_target_volume_within_time_budget(
     retail = ds.accounts.filter(pl.col("archetype") != "exit_point")
     assert retail.height == settings.n_accounts
 
-    # Transaction count lands near the target. Background traffic is Poisson
-    # so it will not be exact; ring episodes add on top of it.
-    assert ds.transactions.height >= settings.target_transactions
-    assert ds.transactions.height <= settings.target_transactions * 1.15
+    # The acceptance bar is 250k transactions. `target_transactions` sizes the
+    # *background* layer only -- pass-through sweeps and ring episodes are
+    # generated on top of it, so the emitted dataset is roughly a third larger.
+    assert ds.transactions.height >= 250_000, (
+        f"only {ds.transactions.height:,} transactions; the bar is 250,000"
+    )
+    assert ds.transactions.height <= settings.target_transactions * 2.5, (
+        "dataset is far larger than the background target implies -- check the "
+        "pass-through layer has not run away"
+    )
 
 
 # ------------------------------------------------------------------- integrity
@@ -154,8 +161,8 @@ def test_every_ring_has_a_cashout_path(dataset: GeneratedDataset) -> None:
 def test_rings_share_infrastructure(dataset: GeneratedDataset) -> None:
     """The shared-infrastructure tell is the signal that beats per-account rules.
 
-    If this does not hold, the GNN has nothing to learn that LightGBM on node
-    features could not already see.
+    If this does not hold, the graph model has nothing to learn that LightGBM
+    on node features could not already see.
     """
     accounts = dataset.accounts.join(dataset.labels, on="account_id", how="inner")
 
@@ -166,9 +173,47 @@ def test_rings_share_infrastructure(dataset: GeneratedDataset) -> None:
         # below the member count.
         assert n_devices < members.height, f"ring {ring.ring_id} shares no devices"
 
-        # Accounts in a ring are opened in a narrow window.
-        spread_days = (members["open_date"].max() - members["open_date"].min()).days
-        assert spread_days <= settings.ring_open_window_days
+        # A meaningful bloc of the ring was opened inside one narrow window.
+        # Deliberately *not* all of it -- see `ring_open_window_prob`. Testing
+        # for the full membership would be testing that the dataset is easier
+        # than it is.
+        opened = sorted(members["open_date"].to_list())
+        window = timedelta(days=settings.ring_open_window_days)
+        best = max(
+            sum(1 for other in opened if anchor <= other <= anchor + window)
+            for anchor in opened
+        )
+        assert best >= 0.35 * members.height, (
+            f"ring {ring.ring_id}: only {best}/{members.height} accounts were "
+            "opened in a co-ordinated window"
+        )
+
+
+def test_ring_tells_are_not_universal(dataset: GeneratedDataset) -> None:
+    """No single tell may identify every mule.
+
+    This is the guard against the most damaging failure mode in the whole
+    project: if every ring account carries every tell, the classes separate
+    perfectly, both detectors score ~1.00 AUC-PR, and the benchmark measures
+    nothing at all. The accounts carrying *no* individual tell are the ones the
+    graph model exists to catch.
+    """
+    accounts = dataset.accounts.join(dataset.labels, on="account_id", how="inner")
+    mules = accounts.filter(pl.col("is_mule"))
+    assert mules.height > 0
+
+    # Some mules were never dormant -- they were bought while already in use.
+    never_dormant = mules.filter(
+        pl.col("prior_activity_date") > pl.col("open_date")
+    )
+    assert never_dormant.height > 0, "every mule shows a dormancy break"
+
+    # And some are on a device nobody else in their ring uses.
+    device_counts = (
+        mules.group_by(["ring_id", "device_fingerprint"]).len().rename({"len": "n"})
+    )
+    solo = device_counts.filter(pl.col("n") == 1)
+    assert solo.height > 0, "every mule shares a device with a ring-mate"
 
 
 def test_structuring_rings_sit_under_the_threshold(dataset: GeneratedDataset) -> None:

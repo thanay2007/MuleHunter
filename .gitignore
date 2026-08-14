@@ -26,3 +26,7 @@ Thumbs.db
 
 # Local overrides
 .env
+
+# Browser automation scratch output
+.playwright-mcp/
+*.png

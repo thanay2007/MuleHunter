@@ -127,8 +127,12 @@ def build_accounts(rng: np.random.Generator) -> pl.DataFrame:
     pool = max(1, int(n * settings.legit_device_pool_ratio))
     device_idx = rng.integers(0, pool, size=n)
 
-    # IP prefix is tied to district, so geography and network correlate.
-    ip_sub = rng.integers(0, 24, size=n)
+    # IP prefix is tied to district, so geography and network correlate. The
+    # pool is wide enough that an ordinary /24 holds a couple of accounts --
+    # a household, a small office. Too narrow a pool and ordinary accounts end
+    # up in larger IP clusters than mule rings do, which inverts the feature
+    # and teaches the detector precisely the wrong thing.
+    ip_sub = rng.integers(0, 250, size=n)
 
     accounts = pl.DataFrame(
         {
@@ -142,10 +146,43 @@ def build_accounts(rng: np.random.Generator) -> pl.DataFrame:
             "home_ip_prefix": [
                 f"10.{d}.{s}.0/24" for d, s in zip(districts.tolist(), ip_sub.tolist())
             ],
+            "prior_activity_date": _prior_activity(rng, archetypes, open_dates),
         }
     )
 
     return _stamp_scenario_victims(accounts)
+
+
+def _prior_activity(
+    rng: np.random.Generator, archetypes: np.ndarray, open_dates: np.ndarray
+) -> list[date]:
+    """When each account last moved money *before* the simulated window opens.
+
+    Without this, dormancy is unmeasurable. The generator emits 30 days of
+    traffic, but a real account has years of it, so "days since last activity"
+    computed inside the window would flag every old legitimate account and
+    nothing else -- the feature would be an artefact of the window length.
+
+    Banks do know this date, so the account table carries it. Legitimate
+    accounts get a gap drawn from their own activity rate, which correctly
+    leaves genuinely sparse archetypes (homemakers) looking dormant-ish; that
+    is a hard negative, and it should be hard. Mule accounts are overwritten in
+    `typologies._rewrite_ring_attributes` to have been dormant since opening,
+    which is the tell that actually distinguishes them.
+    """
+    start, _ = window_bounds()
+    rates = np.array([settings.daily_txn_rate[a] for a in archetypes])
+    # Mean gap between transactions is 1/rate; the last gap before the window
+    # opened is one more draw from that same exponential.
+    gaps = rng.exponential(1.0 / np.maximum(rates, 1e-3))
+    gaps = np.clip(np.round(gaps), 0, 3_000).astype(int)
+
+    out: list[date] = []
+    for i, gap in enumerate(gaps.tolist()):
+        when = start - timedelta(days=gap)
+        # An account cannot have transacted before it existed.
+        out.append(max(when, open_dates[i]))
+    return out
 
 
 def _stamp_scenario_victims(accounts: pl.DataFrame) -> pl.DataFrame:
@@ -183,6 +220,7 @@ def build_exit_nodes() -> pl.DataFrame:
                 "district": district,
                 "device_fingerprint": f"DEV-{kind}",
                 "home_ip_prefix": "0.0.0.0/0",
+                "prior_activity_date": date.fromisoformat(settings.sim_end_date),
                 "exit_kind": kind,
             }
         )
@@ -247,11 +285,17 @@ def build_background_transactions(
     accounts: pl.DataFrame,
     exit_nodes: pl.DataFrame,
     active: np.ndarray,
+    live_from_day: np.ndarray,
 ) -> pl.DataFrame:
     """Ordinary, non-fraudulent traffic across the whole population.
 
-    `active` masks out mule accounts, which were dormant for months before
-    activation and so contribute no background traffic by construction.
+    `live_from_day` is the first day each account may transact at all. It is 0
+    for legitimate accounts and the day of its ring's first laundering run for
+    a mule: before that the account sat untouched, which is the dormancy break.
+
+    Mules do generate ordinary traffic after activation, at a reduced rate --
+    see `mule_background_rate_ratio` for why that is essential rather than
+    cosmetic.
     """
     n = accounts.height
     start, _ = window_bounds()
@@ -263,8 +307,10 @@ def build_background_transactions(
     rates = np.array(
         [settings.daily_txn_rate[a] for a in archetypes], dtype=np.float64
     )
-    rates = np.where(active, rates, 0.0)
-    expected = rates * settings.sim_days
+    rates = np.where(active, rates, rates * settings.mule_background_rate_ratio)
+    # Only the days an account is actually live count toward its volume.
+    live_days = np.maximum(settings.sim_days - live_from_day, 0)
+    expected = rates * live_days
 
     # One global factor puts the total on target while preserving the relative
     # activity of each archetype. See simulator/README.md.
@@ -295,6 +341,23 @@ def build_background_transactions(
     # --- timing -----------------------------------------------------------
     day_p = _day_weights(start, settings.sim_days)
     days = rng.choice(settings.sim_days, size=total, p=day_p)
+
+    # An account cannot transact before it is live. Rather than clipping (which
+    # would pile a spike of activity onto the activation day) the day is
+    # rescaled into the account's live range, preserving the shape.
+    src_live = live_from_day[src]
+    late = src_live > 0
+    if late.any():
+        span = (settings.sim_days - src_live[late]).astype(np.float64)
+        fraction = days[late] / float(settings.sim_days)
+        days[late] = src_live[late] + np.floor(fraction * span).astype(days.dtype)
+
+    # Nor can it *receive* before it is live -- an inbound credit to a dormant
+    # mule would erase the very gap that makes dormancy detectable.
+    bad = (days < live_from_day[dst]) | (dst == src)
+    while bad.any():
+        dst[bad] = rng.integers(0, n, size=int(bad.sum()))
+        bad = (days < live_from_day[dst]) | (dst == src)
 
     hour_p = np.array(settings.diurnal_weights)
     hour_p = hour_p / hour_p.sum()
@@ -343,7 +406,110 @@ def build_background_transactions(
         }
     )
 
-    return _add_salary_credits(rng, frame, accounts, active)
+    frame = _add_salary_credits(rng, frame, accounts, active)
+    return _add_passthrough_traffic(rng, frame, accounts, active, regulars)
+
+
+def _add_passthrough_traffic(
+    rng: np.random.Generator,
+    frame: pl.DataFrame,
+    accounts: pl.DataFrame,
+    active: np.ndarray,
+    regulars: np.ndarray,
+) -> pl.DataFrame:
+    """Money that arrives and leaves again within minutes -- legitimately.
+
+    This is the `legit_high_velocity` archetype actually behaving the way its
+    definition demands: chit fund operators, travel agents and wholesale
+    traders take money in and push it straight back out, wide, in minutes.
+
+    Without this the archetype is a hard negative in name only. Independent
+    in/out timing gives every legitimate account a residence time measured in
+    days, so "money left within ten minutes" separates mules almost perfectly
+    and any detector scores ~0.99. That number is not a result, it is an
+    artefact of the traffic model -- and it collapses the moment the system
+    meets a real chit fund.
+
+    With it, the hard negatives sit exactly where the mules sit on every
+    velocity feature, and the detector has to find something better.
+    """
+    archetypes = accounts["archetype"].to_numpy()
+    account_ids = accounts["account_id"].to_numpy()
+    devices = accounts["device_fingerprint"].to_numpy()
+    ips = accounts["home_ip_prefix"].to_numpy()
+
+    fast = np.flatnonzero((archetypes == "legit_high_velocity") & active)
+    if fast.size == 0:
+        return frame
+
+    index_of = {account: i for i, account in enumerate(account_ids)}
+    fast_ids = set(account_ids[fast].tolist())
+
+    inbound = frame.filter(pl.col("dst").is_in(fast_ids)).select(
+        "dst", "amount", "epoch"
+    )
+    if inbound.height == 0:
+        return frame
+
+    targets = np.array([index_of[d] for d in inbound["dst"].to_list()])
+    amounts_in = inbound["amount"].to_numpy()
+    epochs_in = inbound["epoch"].to_numpy()
+
+    # Most credits get swept onward; a minority stay put, as they would.
+    forwarded = rng.random(targets.size) < settings.passthrough_prob
+    if not forwarded.any():
+        return frame
+
+    targets = targets[forwarded]
+    amounts_in = amounts_in[forwarded]
+    epochs_in = epochs_in[forwarded]
+
+    lo, hi = settings.passthrough_fanout
+    splits = rng.integers(lo, hi, size=targets.size, endpoint=True)
+
+    src = np.repeat(targets, splits)
+    parent_amount = np.repeat(amounts_in, splits)
+    parent_epoch = np.repeat(epochs_in, splits)
+
+    # Split each credit into near-equal parts, keeping a working margin back.
+    weights = rng.gamma(shape=8.0, scale=1.0, size=src.size)
+    totals = np.repeat(
+        np.add.reduceat(weights, np.concatenate([[0], np.cumsum(splits)[:-1]])), splits
+    )
+    keep = rng.uniform(*settings.passthrough_retained, size=src.size)
+    amounts = np.round(parent_amount * (1.0 - keep) * weights / totals, 2)
+
+    delay_lo, delay_hi = settings.passthrough_delay_seconds
+    epoch = parent_epoch + rng.integers(delay_lo, delay_hi, size=src.size)
+
+    slot = rng.integers(0, settings.n_regular_counterparties, size=src.size)
+    dst = regulars[src, slot]
+    clash = dst == src
+    while clash.any():
+        dst[clash] = rng.integers(0, len(account_ids), size=int(clash.sum()))
+        clash = dst == src
+
+    keep_rows = amounts > 10.0
+    if not keep_rows.any():
+        return frame
+
+    src, dst = src[keep_rows], dst[keep_rows]
+    amounts, epoch = amounts[keep_rows], epoch[keep_rows]
+
+    sweeps = pl.DataFrame(
+        {
+            "src": account_ids[src],
+            "dst": account_ids[dst].astype(object),
+            "amount": amounts,
+            "epoch": epoch,
+            "channel": ["UPI"] * len(src),
+            "device_fingerprint": devices[src],
+            "ip_prefix": ips[src],
+            "is_fraud": np.zeros(len(src), dtype=bool),
+            "ring_id": np.full(len(src), "", dtype=object),
+        }
+    )
+    return pl.concat([frame, sweeps], how="vertical")
 
 
 def _add_salary_credits(

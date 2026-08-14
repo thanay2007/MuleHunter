@@ -23,6 +23,7 @@ from functools import lru_cache
 import polars as pl
 
 from app.config import settings
+from app.simulator.population import EPOCH_REF
 from app.simulator.scenarios import SCENARIOS_BY_ID, Scenario
 
 log = logging.getLogger(__name__)
@@ -39,10 +40,15 @@ class Dataset:
     accounts: pl.DataFrame
     transactions: pl.DataFrame
     labels: pl.DataFrame
+    episodes: pl.DataFrame
 
     @property
     def account_index(self) -> dict[str, dict[str, object]]:
         return _account_index(self)
+
+    @property
+    def mule_ids(self) -> frozenset[str]:
+        return _mule_ids(self)
 
 
 @lru_cache(maxsize=1)
@@ -50,7 +56,12 @@ def load_dataset() -> Dataset:
     """Load the generated parquet artifacts. Cached for the process lifetime."""
     missing = [
         p.name
-        for p in (settings.accounts_path, settings.transactions_path, settings.labels_path)
+        for p in (
+            settings.accounts_path,
+            settings.transactions_path,
+            settings.labels_path,
+            settings.episodes_path,
+        )
         if not p.exists()
     ]
     if missing:
@@ -62,6 +73,7 @@ def load_dataset() -> Dataset:
         accounts=pl.read_parquet(settings.accounts_path),
         transactions=pl.read_parquet(settings.transactions_path),
         labels=pl.read_parquet(settings.labels_path),
+        episodes=pl.read_parquet(settings.episodes_path),
     )
     log.info(
         "loaded %d accounts / %d transactions",
@@ -75,6 +87,14 @@ def load_dataset() -> Dataset:
 def _account_index(dataset: Dataset) -> dict[str, dict[str, object]]:
     joined = dataset.accounts.join(dataset.labels, on="account_id", how="left")
     return {row["account_id"]: row for row in joined.iter_rows(named=True)}
+
+
+@lru_cache(maxsize=1)
+def _mule_ids(dataset: Dataset) -> frozenset[str]:
+    """Ground truth. Used to *score* results, never to produce them."""
+    return frozenset(
+        dataset.labels.filter(pl.col("is_mule"))["account_id"].to_list()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -94,10 +114,12 @@ class GraphNode:
     layer_index: int
     is_cashout_node: bool
     exit_kind: str
-    depth: int  # hops from the victim
+    depth: int  # hops from the victim along the money's path
     first_seen_minute: int  # minutes after the incident
     amount_in: float
     amount_out: float
+    #: The victim's money that passed through this account.
+    tainted_in: float
 
 
 @dataclass
@@ -105,6 +127,9 @@ class GraphLink:
     source: str
     target: str
     amount: float
+    #: How much of this transfer was the victim's money. Zero for ordinary
+    #: traffic that merely happens to touch an account in the incident.
+    tainted: float
     minute: int
     channel: str
     is_fraud: bool
@@ -122,7 +147,8 @@ class IncidentGraph:
 
     @property
     def total_laundered(self) -> float:
-        return sum(link.amount for link in self.links if link.is_fraud)
+        """Value of this victim's money moving, counted once per hop."""
+        return sum(link.tainted for link in self.links)
 
 
 def _window(dataset: Dataset, start: datetime, end: datetime) -> pl.DataFrame:
@@ -134,18 +160,44 @@ def _window(dataset: Dataset, start: datetime, end: datetime) -> pl.DataFrame:
 def build_incident_graph(
     scenario_id: str, context_hops: int | None = None
 ) -> IncidentGraph:
-    """Slice the incident subgraph for a scenario out of the full dataset."""
+    """Slice the incident subgraph for a scenario out of the full dataset.
+
+    The graph is built from the **traced money**, not from every fraudulent
+    transfer in the window. Those are very different sets: the ring runs a
+    laundering episode every day or two, so a six-hour window around one
+    incident routinely contains other victims' money moving through the same
+    accounts. Drawing all of it produced a canvas full of long edges that had
+    nothing to do with the complaint on screen.
+
+    Tracing here uses the full horizon rather than stopping at the complaint,
+    because the canvas is a replay of what happened -- the *solver* is the part
+    that is restricted to what was visible at the complaint time.
+    """
     scenario = SCENARIOS_BY_ID.get(scenario_id)
     if scenario is None:
         raise KeyError(f"Unknown scenario {scenario_id!r}")
+
+    from app.graphstore.trace import trace_taint, transaction_index
 
     dataset = load_dataset()
     horizon = timedelta(hours=settings.incident_horizon_hours)
     start = scenario.incident_time
     end = start + horizon
 
+    state = trace_taint(
+        scenario.victim_account,
+        scenario.amount_inr,
+        start,
+        end,
+        transaction_index(),
+    )
+
     window = _window(dataset, start, end)
-    arrival, order = _temporal_reach(window, scenario.victim_account, start)
+    arrival = {
+        account: start + timedelta(seconds=epoch - state.t0)
+        for account, epoch in state.first_seen.items()
+    }
+    depth = _taint_depth(state, scenario.victim_account)
 
     core = set(arrival)
     if context_hops is None:
@@ -154,8 +206,32 @@ def build_incident_graph(
 
     keep = core | context
     edges = window.filter(pl.col("src").is_in(keep) & pl.col("dst").is_in(keep))
+    tainted = {
+        (flow.src, flow.dst, flow.epoch): flow.tainted for flow in state.flows
+    }
 
-    return _assemble(dataset, scenario, arrival, order, context, edges, start)
+    return _assemble(
+        dataset, scenario, arrival, depth, context, edges, start, state, tainted
+    )
+
+
+def _taint_depth(state, victim: str) -> dict[str, int]:
+    """Hops from the victim along the path the money actually took."""
+    children: dict[str, list[str]] = {}
+    for flow in sorted(state.flows, key=lambda f: f.epoch):
+        children.setdefault(flow.src, []).append(flow.dst)
+
+    depth = {victim: 0}
+    frontier = [victim]
+    while frontier:
+        nxt: list[str] = []
+        for node in frontier:
+            for child in children.get(node, ()):
+                if child not in depth:
+                    depth[child] = depth[node] + 1
+                    nxt.append(child)
+        frontier = nxt
+    return depth
 
 
 def _temporal_reach(
@@ -217,6 +293,8 @@ def _assemble(
     context: set[str],
     edges: pl.DataFrame,
     t0: datetime,
+    state: object,
+    tainted: dict[tuple[str, str, int], float],
 ) -> IncidentGraph:
     index = dataset.account_index
 
@@ -226,11 +304,20 @@ def _assemble(
 
     for row in edges.iter_rows(named=True):
         minute = int((row["timestamp"] - t0).total_seconds() // 60)
+        # Keyed on (src, dst, epoch) to match the traced flows exactly. Note
+        # `datetime.timestamp()` is never used -- it reads the machine's local
+        # timezone and would make this depend on where the code runs.
+        key = (
+            row["src"],
+            row["dst"],
+            int((row["timestamp"] - EPOCH_REF).total_seconds()),
+        )
         links.append(
             GraphLink(
                 source=row["src"],
                 target=row["dst"],
                 amount=float(row["amount"]),
+                tainted=round(tainted.get(key, 0.0), 2),
                 minute=minute,
                 channel=row["channel"],
                 is_fraud=bool(row["is_fraud"]),
@@ -276,6 +363,9 @@ def _assemble(
                 first_seen_minute=int((seen - t0).total_seconds() // 60) if seen else -1,
                 amount_in=round(flow_in.get(account_id, 0.0), 2),
                 amount_out=round(flow_out.get(account_id, 0.0), 2),
+                tainted_in=round(
+                    getattr(state, "through", {}).get(account_id, 0.0), 2
+                ),
             )
         )
 

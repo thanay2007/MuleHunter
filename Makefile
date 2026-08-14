@@ -4,7 +4,7 @@
 #     .\run.ps1 setup | data | train | dev | test
 # The two are kept in sync deliberately.
 
-.PHONY: setup data train dev dev-backend dev-frontend test clean
+.PHONY: setup data train bench all dev dev-backend dev-frontend test clean
 
 setup:
 	cd backend && pip install -r requirements.txt
@@ -15,6 +15,14 @@ data:
 
 train:
 	cd backend && python -m app.detect.train
+
+# The 200-incident benchmark. Slow (~45 min) and optional -- the console runs
+# without it, and the Evaluation tab says so rather than faking numbers.
+bench:
+	cd backend && python -m app.eval.harness
+
+# Everything the demo needs.
+all: data train
 
 test:
 	cd backend && pytest

@@ -186,6 +186,7 @@ def inject_rings(
     open_dates = list(accounts["open_date"].to_list())
     devices = accounts["device_fingerprint"].to_list()
     ips = accounts["home_ip_prefix"].to_list()
+    priors = list(accounts["prior_activity_date"].to_list())
 
     rings: list[Ring] = []
     cursor = 0
@@ -203,7 +204,7 @@ def inject_rings(
         used = sum(widths)
         members = members[:used]
 
-        _rewrite_ring_attributes(rng, rid, members, open_dates, devices, ips)
+        _rewrite_ring_attributes(rng, rid, members, open_dates, devices, ips, priors)
 
         rings.append(
             Ring(
@@ -227,6 +228,7 @@ def inject_rings(
         pl.Series("open_date", open_dates),
         pl.Series("device_fingerprint", devices),
         pl.Series("home_ip_prefix", ips),
+        pl.Series("prior_activity_date", priors),
     )
 
     active = np.ones(n, dtype=bool)
@@ -243,6 +245,7 @@ def _rewrite_ring_attributes(
     open_dates: list[date],
     devices: list[str],
     ips: list[str],
+    priors: list[date],
 ) -> None:
     """Stamp the shared-infrastructure tells onto a ring's accounts."""
     incident_day = date.fromisoformat(settings.sim_end_date)
@@ -253,14 +256,38 @@ def _rewrite_ring_attributes(
 
     # Accounts opened inside a narrow window, because one recruiter opened them.
     spread = settings.ring_open_window_days
-    for local, index in enumerate(members):
-        open_dates[index] = anchor - timedelta(days=int(rng.integers(0, spread + 1)))
+    # `hash()` is salted per process for str, so it cannot be used anywhere the
+    # output must reproduce. Derive the IP block from the ring number instead.
+    ring_number = int(ring_id.rsplit("-", 1)[1])
 
-        # Device and IP clusters: several accounts operated from one handset.
-        cluster_size = int(rng.integers(*settings.device_cluster_size, endpoint=True))
-        cluster = local // cluster_size
-        devices[index] = f"DV-{ring_id}-{cluster:02d}"
-        ips[index] = f"172.{abs(hash(ring_id)) % 200}.{cluster % 250}.0/24"
+    # Each tell is applied to only a fraction of the ring. See the probabilities
+    # in config for why: a ring where every account carries every tell is
+    # trivially separable, and the accounts carrying none of them are the ones
+    # that make the graph model worth building.
+    coordinated_open = rng.random(len(members)) < settings.ring_open_window_prob
+    was_dormant = rng.random(len(members)) < settings.ring_dormancy_prob
+    shares_device = rng.random(len(members)) < settings.ring_device_share_prob
+
+    for local, index in enumerate(members):
+        if coordinated_open[local]:
+            # One recruiter walked this group through account opening.
+            open_dates[index] = anchor - timedelta(
+                days=int(rng.integers(0, spread + 1))
+            )
+
+        if was_dormant[local]:
+            # Opened, handed over, then untouched until the syndicate needed it.
+            # That months-long gap is the dormancy break. Accounts bought while
+            # already in use keep their real history and show no gap at all.
+            priors[index] = open_dates[index]
+
+        if shares_device[local]:
+            cluster_size = int(
+                rng.integers(*settings.device_cluster_size, endpoint=True)
+            )
+            cluster = local // cluster_size
+            devices[index] = f"DV-{ring_id}-{cluster:02d}"
+            ips[index] = f"172.{100 + ring_number}.{cluster % 250}.0/24"
 
 
 # ---------------------------------------------------------------------------
@@ -303,8 +330,11 @@ def simulate_episode(
     devices: list[str],
     ips: list[str],
     bridge: Ring | None = None,
+    legit_pool: np.ndarray | None = None,
 ) -> list[dict[str, object]]:
     """Push one victim's money through a ring and out of the banking system."""
+    if legit_pool is None:
+        legit_pool = np.empty(0, dtype=np.int64)
     rows: list[dict[str, object]] = []
     cap = settings.structuring_threshold_inr if ring.typology == "structuring" else None
 
@@ -372,11 +402,29 @@ def simulate_episode(
             src_idx = member(local)
 
             for position, chunk in enumerate(chunks):
-                child = kids[position % len(kids)]
-                child_idx = member(child)
                 when = arrival[local] + timedelta(
                     seconds=int(rng.integers(lo, hi, endpoint=True))
                 )
+
+                # A share of hops goes to a real business instead of the next
+                # mule. The money stops there -- it was a genuine payment and
+                # the recipient has no onward role. These are the accounts an
+                # over-eager freeze list destroys.
+                if legit_pool.size and rng.random() < settings.laundering_legit_hop_prob:
+                    payee = int(rng.choice(legit_pool))
+                    emit(
+                        account_ids[src_idx],
+                        account_ids[payee],
+                        chunk,
+                        when,
+                        "UPI" if chunk < 100_000 else "IMPS",
+                        devices[src_idx],
+                        ips[src_idx],
+                    )
+                    continue
+
+                child = kids[position % len(kids)]
+                child_idx = member(child)
                 emit(
                     account_ids[src_idx],
                     account_ids[child_idx],
@@ -389,21 +437,33 @@ def simulate_episode(
                 held[child] = held.get(child, 0.0) + chunk
                 arrival[child] = max(arrival.get(child, when), when)
 
-            if bridge_share > 0.01:
-                bridge_idx = bridge.member_indices[0]
+            if bridge_share > 0.01 and bridge is not None:
+                # The bridged slice is laundered through the second ring in
+                # full, not just handed to its collector and abandoned. Running
+                # the whole typology recursively is the only way the money
+                # actually reaches an exit; emitting one transfer and stopping
+                # would leave a large sum parked forever, and every recovery
+                # figure downstream would quietly inherit that error.
                 when = arrival[local] + timedelta(seconds=int(rng.integers(lo, hi)))
-                rows.append(
-                    {
-                        "src": account_ids[src_idx],
-                        "dst": account_ids[bridge_idx],
-                        "amount": round(bridge_share, 2),
-                        "epoch": to_epoch(when),
-                        "channel": "IMPS",
-                        "device_fingerprint": devices[src_idx],
-                        "ip_prefix": ips[src_idx],
-                        "is_fraud": True,
-                        "ring_id": bridge.ring_id,
-                    }
+                rows.extend(
+                    simulate_episode(
+                        rng,
+                        bridge,
+                        Episode(
+                            episode_id=f"{episode.episode_id}-bridge",
+                            ring_id=bridge.ring_id,
+                            victim_account=account_ids[src_idx],
+                            amount_inr=round(bridge_share, 2),
+                            start_time=when,
+                            scenario_id=episode.scenario_id,
+                        ),
+                        account_ids,
+                        exit_nodes,
+                        devices,
+                        ips,
+                        bridge=None,
+                        legit_pool=legit_pool,
+                    )
                 )
 
     # --- cash out ---------------------------------------------------------
@@ -421,9 +481,20 @@ def simulate_episode(
             continue
         src_idx = member(local)
         exit_id = exits[(src_idx + local) % len(exits)]
-        when = episode.start_time + timedelta(
+
+        # Cash-out is calibrated to 45-90 minutes after the victim is debited,
+        # but a deep chain can still be moving at minute 90. Scheduling purely
+        # from the episode start would have money leaving an account before it
+        # ever arrived -- so take whichever is later. Deep paths cash out late;
+        # that is the real behaviour, and it is what makes an early freeze
+        # upstream worth more than a late freeze at the exit.
+        landed = arrival.get(local, episode.start_time) + timedelta(
+            minutes=int(rng.integers(2, 15))
+        )
+        calibrated = episode.start_time + timedelta(
             minutes=int(rng.integers(delay_lo, delay_hi, endpoint=True))
         )
+        when = max(landed, calibrated)
 
         n_txns = min(int(math.ceil(amount / per_txn_cap)), 12)
         for step in range(n_txns):
