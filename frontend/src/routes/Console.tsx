@@ -9,6 +9,8 @@ import BudgetControls from '@/components/console/BudgetControls'
 import FreezeQueue from '@/components/console/FreezeQueue'
 import SplitCompare from '@/components/console/SplitCompare'
 import IncidentTimeline from '@/components/console/IncidentTimeline'
+import LayoutToggle from '@/components/console/LayoutToggle'
+import LedgerStrip from '@/components/console/LedgerStrip'
 import AccountDrawer from '@/components/inspect/AccountDrawer'
 import { useReplayStream } from '@/hooks/useReplayStream'
 import { useConsole } from '@/store/console'
@@ -75,9 +77,11 @@ export default function Console() {
   const adaptive = useConsole((s) => s.adaptiveAdversary)
   const selectedNode = useConsole((s) => s.selectedNode)
   const phase = useConsole((s) => s.phase)
+  const layout = useConsole((s) => s.layout)
   const setScenario = useConsole((s) => s.setScenario)
   const selectNode = useConsole((s) => s.selectNode)
   const setPhase = useConsole((s) => s.setPhase)
+  const setLayout = useConsole((s) => s.setLayout)
 
   const [sweepTrigger, setSweepTrigger] = useState(0)
   const sweptFor = useRef<string | null>(null)
@@ -312,10 +316,22 @@ export default function Console() {
               >
                 {reported ? 'complaint filed' : 'nobody knows yet'}
               </span>
+              <LayoutToggle />
             </div>
           )}
         </div>
 
+      {/* Canvas and ledger share the remaining space. In `side` they sit next
+          to each other; otherwise the ledger sits underneath. The timeline
+          always stays directly under the graph, because it is the transport for
+          the thing you are watching. */}
+      <div
+        className={[
+          'flex-1 min-h-0',
+          layout === 'side' ? 'flex' : 'flex flex-col',
+        ].join(' ')}
+      >
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0 relative">
           {graphQuery.isPending && scenarioId && (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -382,28 +398,49 @@ export default function Console() {
           </div>
         )}
 
-        <div className="shrink-0 p-4 border-t border-ink-line">
-          {scenario ? (
-            <SplitCompare
-              frame={stream.frame}
-              header={stream.header}
-              amountInr={scenario.amount_inr}
-              innocentFrozen={
-                interdiction.data?.outcome.innocent_frozen ??
-                stream.header?.final.chakravyuh.innocent_frozen ??
-                0
-              }
-              baselineInnocentFrozen={
-                stream.header?.final.baseline.innocent_frozen ?? 0
-              }
-            />
-          ) : (
-            <div className="ledger px-6 py-8 text-center text-[15.5px] text-paper-text/60">
-              Pick a scenario to see where its money went.
-            </div>
-          )}
         </div>
 
+        {/* --------------------------------------------------------- ledger */}
+        {layout === 'focus' ? (
+          <div className="shrink-0 p-3 border-t border-ink-line">
+            <LedgerStrip
+              frame={stream.frame}
+              amountInr={scenario?.amount_inr ?? 0}
+              onExpand={() => setLayout('stacked')}
+            />
+          </div>
+        ) : (
+          <div
+            className={[
+              'shrink-0',
+              layout === 'side'
+                ? 'w-[430px] border-l border-ink-line overflow-y-auto p-4'
+                : 'border-t border-ink-line p-4',
+            ].join(' ')}
+          >
+            {scenario ? (
+              <SplitCompare
+                frame={stream.frame}
+                header={stream.header}
+                amountInr={scenario.amount_inr}
+                innocentFrozen={
+                  interdiction.data?.outcome.innocent_frozen ??
+                  stream.header?.final.chakravyuh.innocent_frozen ??
+                  0
+                }
+                baselineInnocentFrozen={
+                  stream.header?.final.baseline.innocent_frozen ?? 0
+                }
+                dense={layout === 'side'}
+              />
+            ) : (
+              <div className="ledger px-6 py-8 text-center text-[15.5px] text-paper-text/60">
+                Pick a scenario to see where its money went.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       </section>
     </div>
   )

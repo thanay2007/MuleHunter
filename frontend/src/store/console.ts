@@ -12,6 +12,19 @@ import type { GraphNode, PolicyId } from '@/api/client'
 
 export type RunPhase = 'idle' | 'planning' | 'running' | 'done'
 
+/**
+ * How the console divides its space between the network and the money.
+ *
+ *   stacked  ledger across the bottom, canvas above it
+ *   side     ledger docked to the right, canvas takes the rest of the width
+ *   focus    ledger collapsed to a single summary line, canvas takes the room
+ *
+ * Worth having as a real control rather than a fixed layout: while an incident
+ * is replaying you want the graph as large as it will go, and at the end you
+ * want the two columns of figures. Those are different screens.
+ */
+export type ConsoleLayout = 'stacked' | 'side' | 'focus'
+
 interface ConsoleState {
   scenarioId: string | null
   policy: PolicyId
@@ -20,6 +33,7 @@ interface ConsoleState {
   adaptiveAdversary: boolean
   selectedNode: GraphNode | null
   phase: RunPhase
+  layout: ConsoleLayout
 
   setScenario: (id: string) => void
   setPolicy: (policy: PolicyId) => void
@@ -28,6 +42,7 @@ interface ConsoleState {
   setAdaptiveAdversary: (on: boolean) => void
   selectNode: (node: GraphNode | null) => void
   setPhase: (phase: RunPhase) => void
+  setLayout: (layout: ConsoleLayout) => void
   reset: () => void
 }
 
@@ -43,6 +58,7 @@ export const useConsole = create<ConsoleState>((set) => ({
   adaptiveAdversary: false,
   selectedNode: null,
   phase: 'idle',
+  layout: 'stacked',
 
   setScenario: (id) =>
     set({ scenarioId: id, selectedNode: null, phase: 'idle' }),
@@ -56,5 +72,8 @@ export const useConsole = create<ConsoleState>((set) => ({
     set({ adaptiveAdversary, phase: 'idle' }),
   selectNode: (selectedNode) => set({ selectedNode }),
   setPhase: (phase) => set({ phase }),
+  // Layout is a view preference, so it deliberately does not reset the phase
+  // the way the budgets do -- rearranging the screen must never discard a plan.
+  setLayout: (layout) => set({ layout }),
   reset: () => set({ selectedNode: null, phase: 'idle' }),
 }))

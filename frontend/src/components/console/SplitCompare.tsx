@@ -28,6 +28,12 @@ interface Props {
   amountInr: number
   innocentFrozen: number
   baselineInnocentFrozen: number
+  /**
+   * Docked into a narrow column rather than spread across the bottom. The two
+   * sides stack vertically, and the divider turns from a vertical hairline into
+   * a horizontal one.
+   */
+  dense?: boolean
 }
 
 function Column({
@@ -119,6 +125,7 @@ export default function SplitCompare({
   amountInr,
   innocentFrozen,
   baselineInnocentFrozen,
+  dense = false,
 }: Props) {
   if (!frame || !header) {
     return (
@@ -162,7 +169,7 @@ export default function SplitCompare({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-12">
+      <div className={dense ? 'flex flex-col gap-6' : 'grid grid-cols-2 gap-12'}>
         <Column
           title="Current practice"
           subtitle="freeze the named account"
@@ -172,10 +179,13 @@ export default function SplitCompare({
           frozen={frame.baseline.frozen.length}
           amount={amountInr}
         />
-        <div className="relative min-w-0">
-          {/* Hairline rule, 1px, never 2px. */}
+        <div className={dense ? 'relative min-w-0 pt-6' : 'relative min-w-0'}>
+          {/* Hairline rule, 1px, never 2px. Vertical between columns when the
+              panel is wide; horizontal between rows when it is docked. */}
           <div
-            className="absolute -left-6 top-0 bottom-0 w-px"
+            className={
+              dense ? 'absolute left-0 right-0 top-0 h-px' : 'absolute -left-6 top-0 bottom-0 w-px'
+            }
             style={{ background: 'rgba(42, 38, 32, 0.15)' }}
           />
           <Column
@@ -192,7 +202,10 @@ export default function SplitCompare({
 
       {/* The gap is the entire argument, so it gets the largest figure here. */}
       <div
-        className="mt-6 pt-5 flex items-center gap-6"
+        className={[
+          'mt-6 pt-5 gap-5',
+          dense ? 'flex flex-col items-start' : 'flex items-center gap-6',
+        ].join(' ')}
         style={{ borderTop: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
         {!anythingLost ? (
