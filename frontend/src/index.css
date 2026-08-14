@@ -1,8 +1,15 @@
 /* Fonts are installed via npm (@fontsource/*) so the app works fully offline.
-   No CDN, no network call at runtime. */
-@import '@fontsource/archivo/600.css';
-@import '@fontsource/inter-tight/400.css';
-@import '@fontsource/inter-tight/500.css';
+   No CDN, no network call at runtime.
+
+   One family, two widths: IBM Plex Sans for everything that is words, IBM Plex
+   Mono for everything that is a figure. They were drawn as a system, so the
+   sans and the mono share proportions and the console reads as one surface
+   rather than three unrelated faces. Plex Sans is also a warmer, more humanist
+   shape than the previous Inter Tight, which matters because most of this
+   interface is small text. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
 
@@ -29,10 +36,63 @@
     font-feature-settings: 'tnum' 1;
   }
 
+  /* `font-display` sets the family only, so carry the weight with it -- every
+     section header in the product uses this class and expects semibold. */
+  .font-display {
+    font-weight: 600;
+  }
+
   /* Keyboard focus is visible on every control -- quality floor, not optional. */
   :focus-visible {
     outline: 1px solid theme('colors.hi');
     outline-offset: 2px;
+  }
+
+  /* Scrollbars belong to the console, not to the operating system. The default
+     Windows bar is a wide light-grey slab that sits on a dark panel like a
+     foreign object, and there are several scroll areas on this screen at once.
+     Firefox takes the two-property form; the rest go through ::-webkit-*. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.ink.line') transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* The transparent border plus content-box clipping is what makes the thumb
+     read as a slim 4px pill with breathing room, rather than filling the
+     full gutter width. */
+  ::-webkit-scrollbar-thumb {
+    background-color: theme('colors.ink.line');
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: theme('colors.lo');
+  }
+
+  /* Scroll areas that sit on ledger paper need a warm thumb instead, or a cold
+     navy one appears on cream. */
+  .on-paper {
+    scrollbar-color: theme('colors.paper.line') transparent;
+  }
+
+  .on-paper::-webkit-scrollbar-thumb {
+    background-color: theme('colors.paper.line');
+  }
+
+  .on-paper::-webkit-scrollbar-thumb:hover {
+    background-color: theme('colors.paper.text');
   }
 }
 
@@ -42,20 +102,18 @@
     @apply bg-ink-raised border border-ink-line rounded-panel;
   }
 
-  /* A ledger inset: warm passbook paper with ruled lines. Only money goes here. */
+  /* A ledger inset: warm passbook paper. Only money goes here.
+     One flat colour, edge to edge. Earlier versions ruled it at fixed
+     intervals and then notched the edges; both read as rendering faults rather
+     than as stationery. The surface does not need decoration -- being the only
+     warm panel in a cold interface is already what makes it stand out. */
   .ledger {
-    @apply bg-paper text-paper-text rounded-panel;
-    background-image: repeating-linear-gradient(
-      to bottom,
-      transparent,
-      transparent 27px,
-      theme('colors.paper.line') 27px,
-      theme('colors.paper.line') 28px
-    );
+    @apply bg-paper text-paper-text rounded-panel relative;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   }
 
   .label-lo {
-    @apply text-lo text-[11px] tracking-wide;
+    @apply text-lo text-[13px] tracking-wide;
   }
 }
 

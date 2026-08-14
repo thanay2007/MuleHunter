@@ -21,17 +21,17 @@ const ACTION_META: Record<
   full_freeze: {
     label: 'Full freeze',
     icon: Snowflake,
-    hint: 'All movement blocked',
+    hint: 'Nothing moves in or out',
   },
   outbound_hold: {
     label: 'Outbound hold',
     icon: ShieldAlert,
-    hint: 'Credits allowed, debits blocked',
+    hint: 'Money can come in, but not go out',
   },
   step_up_verification: {
-    label: 'Step-up check',
+    label: 'Extra ID check',
     icon: UserCheck,
-    hint: 'Re-verify before any debit clears',
+    hint: 'Prove who you are before money leaves',
   },
 }
 
@@ -50,9 +50,8 @@ export default function FreezeQueue({
 }: Props) {
   if (plan.length === 0) {
     return (
-      <p className="text-[12px] text-lo leading-relaxed">
-        No plan yet. Run the interdiction to see which accounts to freeze, and
-        in what order.
+      <p className="text-[14px] text-lo leading-relaxed">
+        No plan yet. Run it to see which accounts to freeze, and in what order.
       </p>
     )
   }
@@ -80,7 +79,7 @@ export default function FreezeQueue({
               ].join(' ')}
             >
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[11px] text-lo w-5 shrink-0 tabular-nums">
+                <span className="font-mono text-[13px] text-lo w-5 shrink-0 tabular-nums">
                   {step.rank}
                 </span>
                 <Icon
@@ -88,19 +87,19 @@ export default function FreezeQueue({
                   className={issued ? 'text-interdict shrink-0' : 'text-lo shrink-0'}
                   aria-hidden
                 />
-                <span className="font-mono text-[12px] text-hi truncate">
+                <span className="font-mono text-[14px] text-hi truncate">
                   {step.account_id}
                 </span>
-                <span className="font-mono text-[11px] text-lo ml-auto shrink-0 tabular-nums">
+                <span className="font-mono text-[13px] text-lo ml-auto shrink-0 tabular-nums">
                   {rupeesCompact(step.marginal_recovery_inr)}
                 </span>
               </div>
               <div className="flex items-center gap-2 mt-0.5 pl-7">
-                <span className="text-[10.5px] text-lo">{step.bank}</span>
-                <span className="text-[10.5px] text-lo" title={meta.hint}>
+                <span className="text-[12.5px] text-lo">{step.bank}</span>
+                <span className="text-[12.5px] text-lo" title={meta.hint}>
                   {meta.label}
                 </span>
-                <span className="font-mono text-[10.5px] text-lo ml-auto tabular-nums">
+                <span className="font-mono text-[12.5px] text-lo ml-auto tabular-nums">
                   {elapsed(step.issue_at_minute)}
                 </span>
               </div>

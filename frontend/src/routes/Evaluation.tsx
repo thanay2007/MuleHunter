@@ -28,7 +28,7 @@ function Missing({ message }: { message: string }) {
           Not generated yet
         </h2>
       </div>
-      <p className="text-[13px] text-lo leading-relaxed">{message}</p>
+      <p className="text-[15.5px] text-lo leading-relaxed">{message}</p>
     </div>
   )
 }
@@ -45,11 +45,11 @@ function Panel({
   return (
     <section className="panel p-5">
       <div className="mb-4">
-        <h2 className="font-display text-[15px] text-hi tracking-display">
+        <h2 className="font-display text-[17.5px] text-hi tracking-display">
           {title}
         </h2>
         {subtitle && (
-          <p className="text-[11.5px] text-lo mt-1 leading-relaxed max-w-2xl">
+          <p className="text-[13.5px] text-lo mt-1 leading-relaxed max-w-2xl">
             {subtitle}
           </p>
         )}
@@ -66,7 +66,7 @@ export default function Evaluation() {
   if (benchmark.isPending) {
     return (
       <div className="h-full flex items-center justify-center">
-        <span className="flex items-center gap-2 text-[13px] text-lo">
+        <span className="flex items-center gap-2 text-[15.5px] text-lo">
           <Loader2 size={14} className="animate-spin" aria-hidden />
           Loading the benchmark…
         </span>
@@ -104,10 +104,10 @@ export default function Evaluation() {
     <div className="h-full overflow-y-auto">
       <div className="p-6 space-y-5 max-w-[1400px]">
         <header>
-          <h1 className="font-display text-[19px] text-hi tracking-display">
+          <h1 className="font-display text-[21px] text-hi tracking-display">
             Evaluation
           </h1>
-          <p className="text-[12.5px] text-lo mt-1.5 leading-relaxed max-w-3xl">
+          <p className="text-[15px] text-lo mt-1.5 leading-relaxed max-w-3xl">
             {count(data.n_incidents)} incidents, drawn only from rings held out
             of detector training ({data.holdout_rings.join(', ')}). Freeze
             authority K&nbsp;=&nbsp;{data.budget_k}, innocence budget
@@ -156,7 +156,7 @@ export default function Evaluation() {
         >
           <PolicyTable policies={data.policies} labels={data.policy_labels} />
           {vsTopK && (
-            <p className="text-[11.5px] text-lo mt-3 leading-relaxed">
+            <p className="text-[13.5px] text-lo mt-3 leading-relaxed">
               Chakravyuh recovers{' '}
               <span className="font-mono text-hi">{vsTopK.toFixed(1)}×</span> what
               a top-K classifier recovers at the same freeze budget
@@ -214,7 +214,7 @@ export default function Evaluation() {
                     value={percent(1 - (gap.theoretical_bound ?? 0.632), 1)}
                   />
                 </div>
-                <p className="text-[11.5px] text-lo leading-relaxed">
+                <p className="text-[13.5px] text-lo leading-relaxed">
                   Solved exactly on {count(gap.n_incidents)} incidents small
                   enough for CP-SAT (median{' '}
                   {(gap.cpsat_ms_median ?? 0).toFixed(0)} ms). Both solvers
@@ -223,7 +223,7 @@ export default function Evaluation() {
                 </p>
               </div>
             ) : (
-              <p className="text-[12px] text-lo leading-relaxed">
+              <p className="text-[14px] text-lo leading-relaxed">
                 {gap.note ?? 'No incidents were small enough to solve exactly.'}
               </p>
             )}
@@ -282,7 +282,7 @@ export default function Evaluation() {
             subtitle={`Rules, gradient boosting and a graph network, all trained on identical data and scored on identical held-out incidents (${detector.data.holdout_rings.join(', ')}). Detection feeds the solver; it is not the product.`}
           >
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px] border-collapse min-w-[640px]">
+              <table className="w-full text-[14px] border-collapse min-w-[640px]">
                 <thead>
                   <tr className="text-lo text-left">
                     <th className="font-normal py-2 pr-4">Tier</th>
@@ -318,7 +318,7 @@ export default function Evaluation() {
               </table>
             </div>
 
-            <p className="text-[11.5px] text-lo mt-3 leading-relaxed max-w-3xl">
+            <p className="text-[13.5px] text-lo mt-3 leading-relaxed max-w-3xl">
               The rules tier flags {count(detector.data.tiers[0]?.flagged ?? 0)}{' '}
               accounts at{' '}
               {((detector.data.tiers[0]?.precision ?? 0) * 100).toFixed(0)}%
@@ -331,7 +331,7 @@ export default function Evaluation() {
               </span>{' '}
               against ground truth.
             </p>
-            <p className="text-[11.5px] text-lo mt-2 leading-relaxed max-w-3xl">
+            <p className="text-[13.5px] text-lo mt-2 leading-relaxed max-w-3xl">
               Note the scores are high because the task is heavily conditioned:
               these accounts are already known to have received money traced
               from a live fraud complaint minutes earlier. This is a much easier
@@ -341,7 +341,7 @@ export default function Evaluation() {
           </Panel>
         )}
 
-        <p className="text-[11px] text-lo/70 pb-4">
+        <p className="text-[13px] text-lo/70 pb-4">
           Benchmark generated in {data.generated_seconds.toFixed(0)}s. Regenerate
           with <span className="font-mono">python -m app.eval.harness</span>.
         </p>

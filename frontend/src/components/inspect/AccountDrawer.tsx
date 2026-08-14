@@ -32,7 +32,7 @@ interface Props {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3 text-[12px]">
+    <div className="flex justify-between gap-3 text-[14px]">
       <dt className="text-lo">{label}</dt>
       <dd className="font-mono text-hi text-right tabular-nums">{value}</dd>
     </div>
@@ -50,8 +50,8 @@ function ShapBars({ detail }: { detail: AccountDetail }) {
         return (
           <li key={a.feature}>
             <div className="flex items-baseline justify-between gap-2 mb-1">
-              <span className="text-[11.5px] text-hi leading-snug">{a.plain}</span>
-              <span className="font-mono text-[10.5px] text-lo shrink-0 tabular-nums">
+              <span className="text-[13.5px] text-hi leading-snug">{a.plain}</span>
+              <span className="font-mono text-[12.5px] text-lo shrink-0 tabular-nums">
                 {a.shap >= 0 ? '+' : ''}
                 {a.shap.toFixed(2)}
               </span>
@@ -83,7 +83,7 @@ function FeatureDeviations({ detail }: { detail: AccountDetail }) {
 
   if (notable.length === 0) {
     return (
-      <p className="text-[11.5px] text-lo leading-relaxed">
+      <p className="text-[13.5px] text-lo leading-relaxed">
         This account sits close to the population median on every feature. That
         is exactly why a per-account rule engine cannot see it.
       </p>
@@ -96,7 +96,7 @@ function FeatureDeviations({ detail }: { detail: AccountDetail }) {
         const magnitude = Math.min(1, Math.abs(f.deviation) / 6)
         const above = f.deviation > 0
         return (
-          <li key={f.feature} className="text-[11px]">
+          <li key={f.feature} className="text-[13px]">
             <div className="flex justify-between gap-2 mb-0.5">
               <span className="text-lo truncate">{f.label}</span>
               <span className="font-mono text-hi shrink-0 tabular-nums">
@@ -129,7 +129,7 @@ function MarginalRecovery({ detail }: { detail: AccountDetail }) {
 
   if (marginal.saved_inr <= 0) {
     return (
-      <p className="text-[11.5px] text-lo leading-relaxed">
+      <p className="text-[13.5px] text-lo leading-relaxed">
         Freezing this account would not have saved anything: no forecast path of
         the victim&rsquo;s money runs through it after the complaint.
       </p>
@@ -140,7 +140,7 @@ function MarginalRecovery({ detail }: { detail: AccountDetail }) {
 
   return (
     <div>
-      <p className="text-[12px] text-hi leading-relaxed">
+      <p className="text-[14px] text-hi leading-relaxed">
         Freezing this account at{' '}
         <span className="font-mono tabular-nums">
           {elapsed(marginal.issued_at_minute ?? 0)}
@@ -153,7 +153,7 @@ function MarginalRecovery({ detail }: { detail: AccountDetail }) {
       </p>
 
       {later.length > 0 && (
-        <p className="text-[11.5px] text-lo leading-relaxed mt-2">
+        <p className="text-[13.5px] text-lo leading-relaxed mt-2">
           Issued at{' '}
           <span className="font-mono tabular-nums">
             {elapsed(later[later.length - 1]!.minute)}
@@ -174,7 +174,7 @@ function MarginalRecovery({ detail }: { detail: AccountDetail }) {
           const share = marginal.saved_inr > 0 ? point.saved_inr / marginal.saved_inr : 0
           return (
             <div key={point.minute} className="flex items-center gap-2">
-              <span className="font-mono text-[10.5px] text-lo w-12 shrink-0 tabular-nums">
+              <span className="font-mono text-[12.5px] text-lo w-12 shrink-0 tabular-nums">
                 {elapsed(point.minute)}
               </span>
               <div className="flex-1 h-1.5 bg-ink rounded-full overflow-hidden">
@@ -187,14 +187,14 @@ function MarginalRecovery({ detail }: { detail: AccountDetail }) {
                   }}
                 />
               </div>
-              <span className="font-mono text-[10.5px] text-hi w-16 text-right shrink-0 tabular-nums">
+              <span className="font-mono text-[12.5px] text-hi w-16 text-right shrink-0 tabular-nums">
                 {rupeesCompact(point.saved_inr)}
               </span>
             </div>
           )
         })}
       </div>
-      <p className="text-[10.5px] text-lo mt-2 leading-snug">
+      <p className="text-[12.5px] text-lo mt-2 leading-snug">
         Recomputed by re-running the cached rollouts with this one freeze
         delayed, every other freeze held fixed.
       </p>
@@ -244,11 +244,11 @@ export default function AccountDrawer({
         >
           <header className="sticky top-0 bg-ink-raised px-4 py-3 border-b border-ink-line flex items-start justify-between gap-3 z-10">
             <div className="min-w-0">
-              <div className="font-mono text-[13px] text-hi truncate">
+              <div className="font-mono text-[15.5px] text-hi truncate">
                 {accountId}
               </div>
               {query.data && (
-                <div className="text-[11px] text-lo mt-0.5 truncate">
+                <div className="text-[13px] text-lo mt-0.5 truncate">
                   {query.data.bank_id} · {query.data.district} ·{' '}
                   {archetypeLabel(query.data.archetype)}
                 </div>
@@ -265,7 +265,7 @@ export default function AccountDrawer({
           </header>
 
           {query.isPending && (
-            <div className="px-4 py-8 flex items-center gap-2 text-[12px] text-lo">
+            <div className="px-4 py-8 flex items-center gap-2 text-[14px] text-lo">
               <Loader2 size={13} className="animate-spin" aria-hidden />
               Working out why…
             </div>
@@ -273,7 +273,7 @@ export default function AccountDrawer({
 
           {query.error && (
             <div className="px-4 py-6">
-              <p className="text-[12px] text-lo leading-relaxed">
+              <p className="text-[14px] text-lo leading-relaxed">
                 {(query.error as Error).message}
               </p>
             </div>
@@ -322,13 +322,13 @@ export default function AccountDrawer({
                 {query.data.rule_flags.length > 0 ? (
                   <ul className="space-y-1">
                     {query.data.rule_flags.map((flag) => (
-                      <li key={flag} className="font-mono text-[11px] text-hi">
+                      <li key={flag} className="font-mono text-[13px] text-hi">
                         {flag}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[11.5px] text-lo leading-relaxed">
+                  <p className="text-[13.5px] text-lo leading-relaxed">
                     Nothing. The rules baseline does not flag this account at
                     all &mdash; individually it is unremarkable, and only its
                     neighbourhood gives it away.
@@ -356,7 +356,7 @@ export default function AccountDrawer({
                     value={query.data.is_cashout_node ? 'yes' : 'no'}
                   />
                 </dl>
-                <p className="text-[10.5px] text-lo mt-2.5 leading-snug">
+                <p className="text-[12.5px] text-lo mt-2.5 leading-snug">
                   Labels come from the generator and are shown so the freeze
                   list can be audited. Nothing above this line uses them.
                 </p>

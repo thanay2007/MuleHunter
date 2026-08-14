@@ -12,6 +12,19 @@ import type { GraphNode, PolicyId } from '@/api/client'
 
 export type RunPhase = 'idle' | 'planning' | 'running' | 'done'
 
+/**
+ * How the console divides its space between the network and the money.
+ *
+ *   stacked  ledger across the bottom, canvas above it
+ *   side     ledger docked to the right, canvas takes the rest of the width
+ *   focus    ledger collapsed to a single summary line, canvas takes the room
+ *
+ * Worth having as a real control rather than a fixed layout: while an incident
+ * is replaying you want the graph as large as it will go, and at the end you
+ * want the two columns of figures. Those are different screens.
+ */
+export type ConsoleLayout = 'stacked' | 'side' | 'focus'
+
 interface ConsoleState {
   scenarioId: string | null
   policy: PolicyId
@@ -20,6 +33,11 @@ interface ConsoleState {
   adaptiveAdversary: boolean
   selectedNode: GraphNode | null
   phase: RunPhase
+  layout: ConsoleLayout
+  /** Height of the ledger band in `stacked`, in px. */
+  ledgerHeight: number
+  /** Width of the ledger dock in `side`, in px. */
+  ledgerWidth: number
 
   setScenario: (id: string) => void
   setPolicy: (policy: PolicyId) => void
@@ -28,8 +46,19 @@ interface ConsoleState {
   setAdaptiveAdversary: (on: boolean) => void
   selectNode: (node: GraphNode | null) => void
   setPhase: (phase: RunPhase) => void
+  setLayout: (layout: ConsoleLayout) => void
+  setLedgerHeight: (height: number) => void
+  setLedgerWidth: (width: number) => void
   reset: () => void
 }
+
+/**
+ * Default ledger band height. The panel's natural height is well over 500px,
+ * and letting it size itself squeezed the graph into a strip -- so the band is
+ * given a fixed share and scrolls internally, and the divider above it drags.
+ */
+export const DEFAULT_LEDGER_HEIGHT = 330
+export const DEFAULT_LEDGER_WIDTH = 430
 
 /** Matches `settings.default_budget_k` / `default_innocence_budget`. */
 export const DEFAULT_BUDGET_K = 25
@@ -43,6 +72,9 @@ export const useConsole = create<ConsoleState>((set) => ({
   adaptiveAdversary: false,
   selectedNode: null,
   phase: 'idle',
+  layout: 'stacked',
+  ledgerHeight: DEFAULT_LEDGER_HEIGHT,
+  ledgerWidth: DEFAULT_LEDGER_WIDTH,
 
   setScenario: (id) =>
     set({ scenarioId: id, selectedNode: null, phase: 'idle' }),
@@ -56,5 +88,10 @@ export const useConsole = create<ConsoleState>((set) => ({
     set({ adaptiveAdversary, phase: 'idle' }),
   selectNode: (selectedNode) => set({ selectedNode }),
   setPhase: (phase) => set({ phase }),
+  // Layout is a view preference, so it deliberately does not reset the phase
+  // the way the budgets do -- rearranging the screen must never discard a plan.
+  setLayout: (layout) => set({ layout }),
+  setLedgerHeight: (ledgerHeight) => set({ ledgerHeight }),
+  setLedgerWidth: (ledgerWidth) => set({ ledgerWidth }),
   reset: () => set({ selectedNode: null, phase: 'idle' }),
 }))

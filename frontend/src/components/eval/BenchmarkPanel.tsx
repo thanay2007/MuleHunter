@@ -21,7 +21,7 @@ import { tokens } from '@/theme/tokens'
  * says which command produces the file rather than showing a plausible number.
  */
 
-const AXIS = { stroke: tokens.textLo, fontSize: 11, fontFamily: 'IBM Plex Mono' }
+const AXIS = { stroke: tokens.textLo, fontSize: 13, fontFamily: 'IBM Plex Mono' }
 
 function chartTooltip() {
   return {
@@ -29,7 +29,7 @@ function chartTooltip() {
       background: tokens.inkRaised,
       border: `1px solid ${tokens.inkLine}`,
       borderRadius: 3,
-      fontSize: 11,
+      fontSize: 13,
       fontFamily: 'IBM Plex Mono',
       color: tokens.textHi,
     },
@@ -48,7 +48,7 @@ export function PolicyTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px] border-collapse min-w-[820px]">
+      <table className="w-full text-[14px] border-collapse min-w-[820px]">
         <thead>
           <tr className="text-lo text-left">
             <th className="font-normal py-2 pr-4">Policy</th>
@@ -138,7 +138,7 @@ export function DelayCurve({ data }: { data: Benchmark['recovery_vs_delay'] }) {
             position: 'insideBottom',
             offset: -2,
             fill: tokens.textLo,
-            fontSize: 10,
+            fontSize: 12,
           }}
         />
         <YAxis
@@ -189,7 +189,7 @@ export function InnocenceCurve({ data }: { data: Benchmark['innocence_sweep'] })
             position: 'insideBottom',
             offset: -2,
             fill: tokens.textLo,
-            fontSize: 10,
+            fontSize: 12,
           }}
         />
         <YAxis
@@ -269,11 +269,11 @@ export function StatTile({
     tone === 'saved' ? 'text-interdict' : tone === 'lost' ? 'text-burn' : 'text-hi'
   return (
     <div className="panel px-4 py-3">
-      <div className={`font-mono tabular-nums text-[20px] leading-none ${colour}`}>
+      <div className={`font-mono tabular-nums text-[22px] leading-none ${colour}`}>
         {value}
       </div>
-      <div className="text-[11px] text-lo mt-1.5 leading-tight">{label}</div>
-      {hint && <div className="text-[10.5px] text-lo/70 mt-1">{hint}</div>}
+      <div className="text-[13px] text-lo mt-1.5 leading-tight">{label}</div>
+      {hint && <div className="text-[12.5px] text-lo/70 mt-1">{hint}</div>}
     </div>
   )
 }

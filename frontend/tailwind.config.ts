@@ -27,8 +27,8 @@ export default {
         lo: tokens.textLo,
       },
       fontFamily: {
-        display: ['Archivo', 'system-ui', 'sans-serif'],
-        sans: ['"Inter Tight"', 'system-ui', 'sans-serif'],
+        display: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       letterSpacing: {
