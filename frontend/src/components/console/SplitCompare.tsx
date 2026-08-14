@@ -58,7 +58,7 @@ function Column({
 
   return (
     <div className="min-w-0">
-      <div className="flex items-baseline justify-between gap-3 mb-3.5">
+      <div className="flex items-baseline justify-between gap-3 mb-2.5">
         <h3 className="font-display text-[15.5px] text-paper-text tracking-display">
           {title}
         </h3>
@@ -75,7 +75,7 @@ function Column({
 
       {/* The drain: teal is what was kept, crimson what was not. */}
       <div
-        className="mt-3.5 h-2.5 w-full rounded-full overflow-hidden flex"
+        className="mt-2.5 h-2.5 w-full rounded-full overflow-hidden flex"
         style={{ boxShadow: 'inset 0 0 0 1px rgba(42, 38, 32, 0.14)' }}
         role="img"
         aria-label={`${percent(keptShare, 0)} kept, ${percent(lostShare, 0)} gone`}
@@ -87,7 +87,7 @@ function Column({
         <div className="h-full flex-1 bg-burn" />
       </div>
 
-      <div className="mt-3 flex items-baseline justify-between gap-3">
+      <div className="mt-2 flex items-baseline justify-between gap-3">
         <span className="font-mono tabular-nums text-[17.5px] text-burn leading-none">
           {rupees(leaked)}
         </span>
@@ -97,7 +97,7 @@ function Column({
       </div>
 
       <div
-        className="mt-3.5 pt-3 flex items-baseline justify-between gap-3 text-[13px] text-paper-text/60"
+        className="mt-2.5 pt-2.5 flex items-baseline justify-between gap-3 text-[13px] text-paper-text/60"
         style={{ borderTop: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
         <span>
@@ -149,9 +149,9 @@ export default function SplitCompare({
   const anythingLost = frame.leaked_inr > 0 || frame.baseline.leaked_inr > 0
 
   return (
-    <div className="ledger px-7 py-6">
+    <div className="ledger px-6 py-4">
       <div
-        className="flex items-baseline justify-between gap-4 pb-3.5 mb-5"
+        className="flex items-baseline justify-between gap-4 pb-3 mb-4"
         style={{ borderBottom: '1px solid rgba(42, 38, 32, 0.13)' }}
       >
         <h2 className="font-display text-[16.5px] text-paper-text tracking-display">
@@ -203,7 +203,7 @@ export default function SplitCompare({
       {/* The gap is the entire argument, so it gets the largest figure here. */}
       <div
         className={[
-          'mt-6 pt-5 gap-5',
+          'mt-4 pt-4 gap-5',
           dense ? 'flex flex-col items-start' : 'flex items-center gap-6',
         ].join(' ')}
         style={{ borderTop: '1px solid rgba(42, 38, 32, 0.13)' }}

@@ -11,6 +11,7 @@ import SplitCompare from '@/components/console/SplitCompare'
 import IncidentTimeline from '@/components/console/IncidentTimeline'
 import LayoutToggle from '@/components/console/LayoutToggle'
 import LedgerStrip from '@/components/console/LedgerStrip'
+import Splitter from '@/components/console/Splitter'
 import AccountDrawer from '@/components/inspect/AccountDrawer'
 import { useReplayStream } from '@/hooks/useReplayStream'
 import { useConsole } from '@/store/console'
@@ -78,10 +79,14 @@ export default function Console() {
   const selectedNode = useConsole((s) => s.selectedNode)
   const phase = useConsole((s) => s.phase)
   const layout = useConsole((s) => s.layout)
+  const ledgerHeight = useConsole((s) => s.ledgerHeight)
+  const ledgerWidth = useConsole((s) => s.ledgerWidth)
   const setScenario = useConsole((s) => s.setScenario)
   const selectNode = useConsole((s) => s.selectNode)
   const setPhase = useConsole((s) => s.setPhase)
   const setLayout = useConsole((s) => s.setLayout)
+  const setLedgerHeight = useConsole((s) => s.setLedgerHeight)
+  const setLedgerWidth = useConsole((s) => s.setLedgerWidth)
 
   const [sweepTrigger, setSweepTrigger] = useState(0)
   const sweptFor = useRef<string | null>(null)
@@ -166,10 +171,12 @@ export default function Console() {
   return (
     <div className="h-full flex">
       {/* ---------------------------------------------------------- left rail */}
-      {/* The rail itself does not scroll: the freeze queue is the thing you
-          watch while the replay runs, and it must not slide below the fold as
-          instructions accumulate. Only the queue scrolls, inside its own box. */}
-      <aside className="w-[286px] shrink-0 border-r border-ink-line flex flex-col overflow-hidden">
+      {/* The freeze queue scrolls inside its own box so it does not slide below
+          the fold as instructions accumulate. The rail can still scroll as a
+          whole when the viewport is too short for the fixed sections above it
+          -- without that fallback the solver stats were being clipped off the
+          bottom edge rather than becoming reachable. */}
+      <aside className="w-[286px] shrink-0 border-r border-ink-line flex flex-col overflow-y-auto">
         <div className="px-4 pt-4 pb-3 shrink-0 max-h-[38%] overflow-y-auto">
           <h2 className="label-lo mb-2">Incident</h2>
           {scenariosQuery.data ? (
@@ -254,7 +261,9 @@ export default function Console() {
           )}
         </div>
 
-        <div className="px-4 py-4 border-t border-ink-line flex-1 min-h-0 flex flex-col">
+        {/* Floor rather than min-h-0: the queue keeps a usable height and the
+            rail scrolls instead, which beats collapsing it to nothing. */}
+        <div className="px-4 py-4 border-t border-ink-line flex-1 min-h-[190px] flex flex-col">
           <div className="flex items-baseline justify-between mb-2 shrink-0">
             <h2 className="label-lo">Freeze queue</h2>
             {plan.length > 0 && (
@@ -410,14 +419,28 @@ export default function Console() {
             />
           </div>
         ) : (
-          <div
-            className={[
-              'shrink-0',
-              layout === 'side'
-                ? 'w-[430px] border-l border-ink-line overflow-y-auto p-4'
-                : 'border-t border-ink-line p-4',
-            ].join(' ')}
-          >
+          <>
+            <Splitter
+              orientation={layout === 'side' ? 'vertical' : 'horizontal'}
+              size={layout === 'side' ? ledgerWidth : ledgerHeight}
+              onChange={layout === 'side' ? setLedgerWidth : setLedgerHeight}
+              min={layout === 'side' ? 320 : 120}
+              max={layout === 'side' ? 760 : Math.max(240, window.innerHeight - 300)}
+              label={
+                layout === 'side' ? 'Resize the ledger dock' : 'Resize the ledger band'
+              }
+            />
+            <div
+              className={[
+                'shrink-0 overflow-y-auto',
+                layout === 'side' ? 'p-4' : 'p-4',
+              ].join(' ')}
+              style={
+                layout === 'side'
+                  ? { width: ledgerWidth }
+                  : { height: ledgerHeight }
+              }
+            >
             {scenario ? (
               <SplitCompare
                 frame={stream.frame}
@@ -438,7 +461,8 @@ export default function Console() {
                 Pick a scenario to see where its money went.
               </div>
             )}
-          </div>
+            </div>
+          </>
         )}
       </div>
       </section>
