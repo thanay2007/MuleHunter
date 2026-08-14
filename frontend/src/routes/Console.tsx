@@ -8,13 +8,16 @@ import ScenarioPicker from '@/components/console/ScenarioPicker'
 import BudgetControls from '@/components/console/BudgetControls'
 import FreezeQueue from '@/components/console/FreezeQueue'
 import SplitCompare from '@/components/console/SplitCompare'
+import IncidentTimeline from '@/components/console/IncidentTimeline'
 import AccountDrawer from '@/components/inspect/AccountDrawer'
 import { useReplayStream } from '@/hooks/useReplayStream'
 import { useConsole } from '@/store/console'
-import { count, duration, elapsed, rupees } from '@/lib/format'
+import { count, duration, rupees } from '@/lib/format'
 import { tokens } from '@/theme/tokens'
 
 const REPLAY_FPS = 12
+/** Used for the timeline before the stream header arrives with the real value. */
+const REPLAY_HORIZON_FALLBACK = 360
 
 function Legend() {
   const items = [
@@ -159,8 +162,11 @@ export default function Console() {
   return (
     <div className="h-full flex">
       {/* ---------------------------------------------------------- left rail */}
-      <aside className="w-[286px] shrink-0 border-r border-ink-line flex flex-col overflow-y-auto">
-        <div className="px-4 pt-4 pb-3">
+      {/* The rail itself does not scroll: the freeze queue is the thing you
+          watch while the replay runs, and it must not slide below the fold as
+          instructions accumulate. Only the queue scrolls, inside its own box. */}
+      <aside className="w-[286px] shrink-0 border-r border-ink-line flex flex-col overflow-hidden">
+        <div className="px-4 pt-4 pb-3 shrink-0 max-h-[38%] overflow-y-auto">
           <h2 className="label-lo mb-2">Incident</h2>
           {scenariosQuery.data ? (
             <ScenarioPicker
@@ -173,12 +179,12 @@ export default function Console() {
           )}
         </div>
 
-        <div className="px-4 py-4 border-t border-ink-line">
+        <div className="px-4 py-4 border-t border-ink-line shrink-0">
           <h2 className="label-lo mb-3">Budgets</h2>
           <BudgetControls />
         </div>
 
-        <div className="px-4 py-4 border-t border-ink-line">
+        <div className="px-4 py-4 border-t border-ink-line shrink-0">
           <button
             type="button"
             onClick={run}
@@ -244,15 +250,17 @@ export default function Console() {
           )}
         </div>
 
-        <div className="px-4 py-4 border-t border-ink-line flex-1">
-          <div className="flex items-baseline justify-between mb-2">
+        <div className="px-4 py-4 border-t border-ink-line flex-1 min-h-0 flex flex-col">
+          <div className="flex items-baseline justify-between mb-2 shrink-0">
             <h2 className="label-lo">Freeze queue</h2>
             {plan.length > 0 && (
               <span className="font-mono text-[11px] text-lo tabular-nums">
+                {count(plan.filter((s) => s.issue_at_minute <= minute).length)} /{' '}
                 {count(plan.length)}
               </span>
             )}
           </div>
+          <div className="flex-1 min-h-0 overflow-y-auto -mr-1 pr-1">
           <FreezeQueue
             plan={plan}
             minute={minute}
@@ -264,6 +272,7 @@ export default function Console() {
               )
             }
           />
+          </div>
         </div>
       </aside>
 
@@ -285,14 +294,15 @@ export default function Console() {
             )}
           </div>
 
+          {/* The clock and replay state live on the timeline below; repeating
+              them here just crowds the bar. */}
           {scenario && (
             <div className="flex items-center gap-3 shrink-0">
-              {stream.status === 'streaming' && (
-                <span className="text-[11px] text-lo">replaying…</span>
-              )}
               <span className="text-[11px] text-lo">
-                {rupees(scenario.amount_inr)} · reported after{' '}
-                {duration(scenario.complaint_delay_minutes)}
+                <span className="font-mono tabular-nums text-hi">
+                  {rupees(scenario.amount_inr)}
+                </span>{' '}
+                · reported after {duration(scenario.complaint_delay_minutes)}
               </span>
               <span
                 className={[
@@ -301,9 +311,6 @@ export default function Console() {
                 ].join(' ')}
               >
                 {reported ? 'complaint filed' : 'nobody knows yet'}
-              </span>
-              <span className="font-mono text-[13px] text-hi tabular-nums">
-                {elapsed(minute)}
               </span>
             </div>
           )}
@@ -361,6 +368,19 @@ export default function Console() {
             onClose={() => selectNode(null)}
           />
         </div>
+
+        {scenario && (
+          <div className="shrink-0 border-t border-ink-line">
+            <IncidentTimeline
+              header={stream.header}
+              fallbackHorizon={REPLAY_HORIZON_FALLBACK}
+              complaintMinute={scenario.complaint_delay_minutes}
+              minute={minute}
+              plan={plan}
+              status={stream.status}
+            />
+          </div>
+        )}
 
         <div className="shrink-0 p-4 border-t border-ink-line">
           {scenario ? (
