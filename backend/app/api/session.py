@@ -83,9 +83,22 @@ def context_for_scenario(scenario_id: str) -> IncidentContext:
 
 
 def warm(scenario_id: str = "S1") -> None:
-    """Pre-build the demo scenario so the first click is not the slow one."""
+    """Prepare everything the first click would otherwise pay for.
+
+    Builds the DuckDB warehouse if it is missing and pre-computes the stage
+    scenario's context. Neither is allowed to prevent the server starting: an
+    API that refuses to boot because a derived file is stale is worse than one
+    that is briefly slow.
+    """
+    from app.graphstore import warehouse
+
+    try:
+        warehouse.ensure_warehouse()
+    except Exception as exc:  # noqa: BLE001 - warming must never block startup
+        log.info("could not build the warehouse: %s", exc)
+
     try:
         context_for_scenario(scenario_id)
         log.info("warmed incident context for %s", scenario_id)
-    except Exception as exc:  # noqa: BLE001 - warming must never block startup
+    except Exception as exc:  # noqa: BLE001
         log.info("could not warm %s: %s", scenario_id, exc)

@@ -386,84 +386,133 @@ def _assemble(
 
 
 def dataset_summary() -> dict[str, object]:
-    """Headline statistics for the dataset overview panel."""
-    dataset = load_dataset()
-    retail = dataset.accounts.filter(pl.col("archetype") != "exit_point")
-    mules = dataset.labels.filter(pl.col("is_mule"))
-    fraud = dataset.transactions.filter(pl.col("is_fraud"))
+    """Headline statistics for the dataset overview panel.
 
-    archetypes = (
-        retail.group_by("archetype").len().sort("len", descending=True).rows(named=True)
-    )
-    channels = (
-        dataset.transactions.group_by("channel")
-        .len()
-        .sort("len", descending=True)
-        .rows(named=True)
-    )
-    hourly = (
-        dataset.transactions.with_columns(pl.col("timestamp").dt.hour().alias("hour"))
-        .group_by("hour")
-        .len()
-        .sort("hour")
-        .rows(named=True)
-    )
+    Runs as SQL against the DuckDB warehouse. This is the division of labour
+    the project commits to: polars holds the hot path, where an incident is
+    sliced and scored inside a request, and DuckDB answers anything that scans
+    the whole dataset to produce a rollup. Doing full-table aggregates in
+    Python loops is what an embedded analytical database exists to avoid.
+    """
+    from app.graphstore import warehouse
 
+    try:
+        headline = warehouse.query(
+            """
+            SELECT
+              (SELECT count(*) FROM retail_accounts)                       AS accounts,
+              (SELECT count(*) FROM account_facts
+                 WHERE archetype = 'exit_point')                           AS exit_nodes,
+              (SELECT count(*) FROM transactions)                          AS transactions,
+              (SELECT count(*) FROM transactions WHERE is_fraud)           AS fraud_transactions,
+              (SELECT count(*) FROM retail_accounts WHERE is_mule)         AS mule_accounts,
+              (SELECT count(DISTINCT bank_id) FROM retail_accounts)        AS banks,
+              (SELECT count(DISTINCT district) FROM retail_accounts)       AS districts,
+              (SELECT coalesce(sum(amount), 0) FROM transactions
+                 WHERE is_fraud)                                           AS total_laundered_inr
+            """
+        )[0]
+        archetypes = warehouse.query(
+            "SELECT archetype AS name, count(*) AS count FROM retail_accounts "
+            "GROUP BY archetype ORDER BY count DESC"
+        )
+        channels = warehouse.query(
+            "SELECT channel AS name, count(*) AS count FROM transactions "
+            "GROUP BY channel ORDER BY count DESC"
+        )
+        hourly = warehouse.query(
+            "SELECT hour(timestamp) AS hour, count(*) AS count FROM transactions "
+            "GROUP BY 1 ORDER BY 1"
+        )
+    except warehouse.WarehouseMissingError as exc:
+        raise DatasetMissingError(str(exc)) from exc
+
+    accounts = int(headline["accounts"])
     return {
-        "accounts": retail.height,
-        "exit_nodes": dataset.accounts.height - retail.height,
-        "transactions": dataset.transactions.height,
-        "fraud_transactions": fraud.height,
-        "mule_accounts": mules.height,
-        "mule_prevalence": round(mules.height / retail.height, 5),
-        "banks": int(retail["bank_id"].n_unique()),
-        "districts": int(retail["district"].n_unique()),
-        "total_laundered_inr": round(float(fraud["amount"].sum()), 2),
-        "archetypes": [{"name": r["archetype"], "count": r["len"]} for r in archetypes],
-        "channels": [{"name": r["channel"], "count": r["len"]} for r in channels],
-        "hourly": [{"hour": r["hour"], "count": r["len"]} for r in hourly],
+        "accounts": accounts,
+        "exit_nodes": int(headline["exit_nodes"]),
+        "transactions": int(headline["transactions"]),
+        "fraud_transactions": int(headline["fraud_transactions"]),
+        "mule_accounts": int(headline["mule_accounts"]),
+        "mule_prevalence": round(int(headline["mule_accounts"]) / max(accounts, 1), 5),
+        "banks": int(headline["banks"]),
+        "districts": int(headline["districts"]),
+        "total_laundered_inr": round(float(headline["total_laundered_inr"]), 2),
+        "archetypes": [
+            {"name": r["name"], "count": int(r["count"])} for r in archetypes
+        ],
+        "channels": [{"name": r["name"], "count": int(r["count"])} for r in channels],
+        "hourly": [
+            {"hour": int(r["hour"]), "count": int(r["count"])} for r in hourly
+        ],
     }
 
 
 def ring_summaries() -> list[dict[str, object]]:
-    """Per-ring rollup: who they are, what they touch, how much moved."""
-    dataset = load_dataset()
-    joined = dataset.accounts.join(dataset.labels, on="account_id", how="inner")
-    mules = joined.filter(pl.col("is_mule"))
+    """Ground-truth per-ring rollup: who they are, what they touch, how much moved.
 
-    flows = (
-        dataset.transactions.filter(pl.col("is_fraud"))
-        .group_by("ring_id")
-        .agg(
-            pl.col("amount").sum().alias("total_flow"),
-            pl.len().alias("txn_count"),
+    Also a SQL rollup over the whole dataset, for the same reason as above.
+    These are the generator's labels, shown so the *discovered* rings in
+    `/api/rings/{scenario_id}` can be checked rather than taken on trust.
+    """
+    from app.graphstore import warehouse
+
+    try:
+        rows = warehouse.query(
+            """
+            WITH members AS (
+              SELECT ring_id,
+                     any_value(typology)                  AS typology,
+                     count(*)                             AS accounts,
+                     count(DISTINCT bank_id)              AS bank_count,
+                     count(DISTINCT district)             AS districts,
+                     count(DISTINCT device_fingerprint)   AS device_clusters,
+                     max(layer_index)                     AS max_layer,
+                     count(*) FILTER (WHERE is_cashout_node) AS cashout_nodes,
+                     -- Median days of silence before the incident window. The
+                     -- rented-account tell, as a number per ring.
+                     median(date_diff('day', prior_activity_date, ?::DATE))
+                                                          AS dormancy_days
+              FROM retail_accounts
+              WHERE is_mule
+              GROUP BY ring_id
+            ),
+            flows AS (
+              SELECT ring_id, sum(amount) AS total_flow, count(*) AS txn_count
+              FROM transactions WHERE is_fraud GROUP BY ring_id
+            )
+            SELECT m.*,
+                   coalesce(f.total_flow, 0) AS total_flow_inr,
+                   coalesce(f.txn_count, 0)  AS txn_count
+            FROM members m LEFT JOIN flows f USING (ring_id)
+            ORDER BY m.ring_id
+            """,
+            [settings.sim_end_date],
         )
-    )
-    flow_by_ring = {r["ring_id"]: r for r in flows.rows(named=True)}
-
-    summaries: list[dict[str, object]] = []
-    for ring_id in sorted(mules["ring_id"].unique().to_list()):
-        members = mules.filter(pl.col("ring_id") == ring_id)
-        flow = flow_by_ring.get(ring_id, {"total_flow": 0.0, "txn_count": 0})
-
-        cashout = members.filter(pl.col("is_cashout_node"))
-        summaries.append(
-            {
-                "ring_id": ring_id,
-                "typology": str(members["typology"][0]),
-                "accounts": members.height,
-                "banks": sorted(members["bank_id"].unique().to_list()),
-                "districts": int(members["district"].n_unique()),
-                "device_clusters": int(members["device_fingerprint"].n_unique()),
-                "max_layer": int(members["layer_index"].max()),
-                "cashout_nodes": cashout.height,
-                "total_flow_inr": round(float(flow["total_flow"]), 2),
-                "txn_count": int(flow["txn_count"]),
-                "dormancy_days": int(
-                    (
-                        members["open_date"].max() - members["open_date"].min()
-                    ).days
-                ),
-            }
+        banks = warehouse.query(
+            "SELECT ring_id, bank_id FROM retail_accounts WHERE is_mule "
+            "GROUP BY ring_id, bank_id ORDER BY ring_id, bank_id"
         )
-    return summaries
+    except warehouse.WarehouseMissingError as exc:
+        raise DatasetMissingError(str(exc)) from exc
+
+    banks_by_ring: dict[str, list[str]] = {}
+    for row in banks:
+        banks_by_ring.setdefault(str(row["ring_id"]), []).append(str(row["bank_id"]))
+
+    return [
+        {
+            "ring_id": str(row["ring_id"]),
+            "typology": str(row["typology"]),
+            "accounts": int(row["accounts"]),
+            "banks": banks_by_ring.get(str(row["ring_id"]), []),
+            "districts": int(row["districts"]),
+            "device_clusters": int(row["device_clusters"]),
+            "max_layer": int(row["max_layer"]),
+            "cashout_nodes": int(row["cashout_nodes"]),
+            "total_flow_inr": round(float(row["total_flow_inr"]), 2),
+            "txn_count": int(row["txn_count"]),
+            "dormancy_days": int(row["dormancy_days"] or 0),
+        }
+        for row in rows
+    ]
