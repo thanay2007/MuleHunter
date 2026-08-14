@@ -43,44 +43,13 @@
   }
 
   /* A ledger inset: warm passbook paper. Only money goes here.
-     No ruled lines -- fixed-interval rules cut through headings and figures at
-     arbitrary heights and read as a rendering fault rather than as stationery.
-     The paper earns its character from the torn edges and the warm gradient
-     instead. */
+     One flat colour, edge to edge. Earlier versions ruled it at fixed
+     intervals and then notched the edges; both read as rendering faults rather
+     than as stationery. The surface does not need decoration -- being the only
+     warm panel in a cold interface is already what makes it stand out. */
   .ledger {
-    @apply bg-paper text-paper-text relative;
-    background-image: linear-gradient(180deg, #efe9db 0%, #e6dfce 100%);
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  }
-
-  /* Torn-pad edges: notches punched in the canvas colour along the top and
-     bottom, so the inset reads as a physical slip laid on the console rather
-     than another rounded rectangle. */
-  .ledger::before,
-  .ledger::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 6px;
-    background-image: radial-gradient(
-      circle at 7px 50%,
-      theme('colors.ink.DEFAULT') 3.6px,
-      transparent 4px
-    );
-    background-size: 14px 6px;
-    background-repeat: repeat-x;
-    pointer-events: none;
-  }
-
-  .ledger::before {
-    top: -1px;
-  }
-
-  .ledger::after {
-    bottom: -1px;
+    @apply bg-paper text-paper-text rounded-panel relative;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   }
 
   .label-lo {
