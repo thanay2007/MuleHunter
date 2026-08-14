@@ -332,12 +332,15 @@ def _greedy(
     heap: list[tuple[float, int, int]] = []
     for position, option in enumerate(candidates):
         gain = gain_of(option, first_minute)
+        # Counted here, not after the filter: the evaluation has already been
+        # paid for by the call above, and a candidate rejected for zero gain
+        # cost exactly as much to reject as one that was kept.
+        plan.evaluations += 1
         if gain <= 0.0:
             continue
         cost = cost_of(option)
         key = gain / max(cost, 1e-6) if by_ratio else gain
         heap.append((-key, position, -1))
-        plan.evaluations += 1
     heapq.heapify(heap)
 
     chosen: set[str] = set()

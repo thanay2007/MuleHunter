@@ -8,6 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.api import session
 from app.graphstore.build import (
     DatasetMissingError,
     build_incident_graph,
@@ -77,7 +78,15 @@ class RingOut(BaseModel):
 @router.get("/graph/{scenario_id}", response_model=GraphOut)
 def get_graph(scenario_id: str) -> GraphOut:
     try:
-        graph = build_incident_graph(scenario_id)
+        # Resolve through the session so a complaint filed at intake draws its
+        # canvas from the same builder as a seeded scenario.
+        incident = session.incident_for(scenario_id)
+        graph = build_incident_graph(
+            scenario_id,
+            victim_account=incident.victim_account,
+            amount_inr=incident.amount_inr,
+            incident_time=incident.incident_time,
+        )
     except DatasetMissingError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except KeyError as exc:

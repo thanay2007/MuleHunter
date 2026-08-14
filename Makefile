@@ -4,7 +4,7 @@
 #     .\run.ps1 setup | data | train | dev | test
 # The two are kept in sync deliberately.
 
-.PHONY: setup data train bench all dev dev-backend dev-frontend test clean
+.PHONY: setup data train bench all dev demo dev-backend dev-frontend test clean
 
 setup:
 	cd backend && pip install -r requirements.txt
@@ -32,6 +32,19 @@ dev:
 	@echo "Start these in two terminals:"
 	@echo "  make dev-backend"
 	@echo "  make dev-frontend"
+
+# One command for the stage: check artifacts, boot the API, wait until it
+# actually answers, boot the frontend, open the browser. Fumbling with two
+# terminals in front of judges is a bad way to spend the first thirty seconds.
+demo:
+	@test -f backend/data/transactions.parquet || { echo "Missing artifacts. Run: make all"; exit 1; }
+	@test -f backend/models/gbdt.txt || { echo "Missing models. Run: make train"; exit 1; }
+	@cd backend && uvicorn app.main:app --port 8000 & \
+	  until curl -sf http://127.0.0.1:8000/api/health >/dev/null; do sleep 1; done; \
+	  echo "API ready."; \
+	  cd frontend && npm run dev & \
+	  sleep 4 && (xdg-open http://localhost:5173 || open http://localhost:5173) ; \
+	  wait
 
 dev-backend:
 	cd backend && uvicorn app.main:app --reload --port 8000

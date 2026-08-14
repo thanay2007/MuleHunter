@@ -18,7 +18,9 @@ from app.api import (
     evaluate,
     graph,
     health,
+    intake,
     interdict,
+    orders,
     scenarios,
     session,
     ws_replay,
@@ -76,4 +78,6 @@ app.include_router(graph.router, prefix="/api", tags=["graph"])
 app.include_router(interdict.router, prefix="/api", tags=["interdict"])
 app.include_router(account.router, prefix="/api", tags=["inspect"])
 app.include_router(evaluate.router, prefix="/api", tags=["evaluate"])
+app.include_router(orders.router, prefix="/api", tags=["orders"])
+app.include_router(intake.router, prefix="/api", tags=["intake"])
 app.include_router(ws_replay.router, tags=["replay"])

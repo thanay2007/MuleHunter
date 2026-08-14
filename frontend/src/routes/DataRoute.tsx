@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { RouteError, RouteLoading } from '@/components/layout/RouteState'
 import {
   Bar,
   BarChart,
@@ -38,8 +39,8 @@ export default function DataRoute() {
     queryFn: api.datasetSummary,
   })
 
-  if (isPending) return <p className="p-8 text-[15.5px] text-lo">Loading dataset…</p>
-  if (error) return <p className="p-8 text-[15.5px] text-lo">{(error as Error).message}</p>
+  if (isPending) return <RouteLoading label="Loading the dataset…" />
+  if (error) return <RouteError error={error} subject="the dataset summary" />
 
   const hourly = data.hourly.map((h) => ({
     hour: String(h.hour).padStart(2, '0'),

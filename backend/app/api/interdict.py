@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.api import session
 from app.config import settings
-from app.detect.explain import phrase
+from app.detect.explain import reason_codes
 from app.graphstore.build import DatasetMissingError
 from app.interdict.greedy import FreezePlan
 from app.interdict.policies import POLICIES, POLICY_LABELS, plan_for
@@ -79,6 +79,10 @@ class InterdictResponse(BaseModel):
     policy_label: str
     budget_k: int
     innocence_budget: float
+    #: Echoed back so the console can caption a result with the adversary it was
+    #: actually scored against, rather than with whatever the checkbox says by
+    #: the time the response lands.
+    adaptive_adversary: bool
 
     plan: list[PlanStepOut]
     projected_recovery_inr: float
@@ -141,6 +145,7 @@ def interdict(request: InterdictRequest) -> InterdictResponse:
         policy_label=POLICY_LABELS.get(request.policy, request.policy),
         budget_k=request.budget_k,
         innocence_budget=request.innocence_budget,
+        adaptive_adversary=request.adaptive_adversary,
         plan=_plan_out(plan, context, mules),
         projected_recovery_inr=plan.projected_recovery_inr,
         projected_leak_inr=plan.projected_leak_inr,
@@ -206,10 +211,7 @@ def _bank_lookup(context) -> dict[str, str]:
 
 def _reason_codes(detector, context, account_id: str) -> list[str]:
     """The two or three strongest reasons, in plain language."""
-    from app.detect.explain import attributions
-
-    found = attributions(detector, context.matrix, account_id, top_n=3)
-    return [phrase(a) for a in found if a.direction == "raises"][:3]
+    return reason_codes(detector, context.matrix, account_id)
 
 
 @router.get("/policies")

@@ -38,6 +38,13 @@ class HealthResponse(BaseModel):
     master_seed: int = Field(
         description="Pinned RNG seed. Identical across runs by design."
     )
+    golden_hour_minutes: int = Field(
+        description=(
+            "Minutes after the fraud by which money has typically left the "
+            "banking system. The console's SLA meter counts down against this "
+            "rather than hardcoding it, so the two cannot drift."
+        )
+    )
     artifacts: ArtifactStatus
 
 
@@ -50,6 +57,7 @@ def get_health() -> HealthResponse:
         phase=settings.phase,
         uptime_seconds=round(time.monotonic() - _STARTED_AT, 3),
         master_seed=settings.master_seed,
+        golden_hour_minutes=settings.golden_hour_minutes,
         artifacts=ArtifactStatus(
             accounts=settings.accounts_path.exists(),
             transactions=settings.transactions_path.exists(),

@@ -8,6 +8,7 @@ import polars as pl
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.api import references
 from app.graphstore.build import (
     DatasetMissingError,
     dataset_summary,
@@ -20,9 +21,17 @@ router = APIRouter()
 
 class ScenarioOut(BaseModel):
     scenario_id: str
+    #: Institutional references, derived deterministically in `references.py`
+    #: so the console, the freeze order and the audit trail all quote the same
+    #: strings for the same case.
+    case_id: str
+    complaint_ref: str
     name: str
     summary: str
     victim_account: str
+    victim_bank: str = Field(
+        description="The bank that took the complaint. Read from the dataset."
+    )
     victim_district: str
     victim_archetype: str
     amount_inr: float
@@ -80,6 +89,13 @@ def list_scenarios() -> list[ScenarioOut]:
     labels = dataset.labels
     fraud = dataset.transactions.filter(pl.col("is_fraud"))
 
+    victim_rows = dataset.accounts.filter(
+        pl.col("account_id").is_in([s.victim_account for s in SCENARIOS])
+    )
+    victim_banks = dict(
+        zip(victim_rows["account_id"].to_list(), victim_rows["bank_id"].to_list())
+    )
+
     out: list[ScenarioOut] = []
     for scenario in SCENARIOS:
         members = labels.filter(pl.col("ring_id") == scenario.ring_id)
@@ -92,9 +108,16 @@ def list_scenarios() -> list[ScenarioOut]:
         out.append(
             ScenarioOut(
                 scenario_id=scenario.scenario_id,
+                case_id=references.case_id(
+                    scenario.scenario_id, scenario.complaint_time
+                ),
+                complaint_ref=references.complaint_ref(
+                    scenario.scenario_id, scenario.complaint_time
+                ),
                 name=scenario.name,
                 summary=scenario.summary,
                 victim_account=scenario.victim_account,
+                victim_bank=victim_banks.get(scenario.victim_account, "—"),
                 victim_district=scenario.victim_district,
                 victim_archetype=scenario.victim_archetype,
                 amount_inr=scenario.amount_inr,

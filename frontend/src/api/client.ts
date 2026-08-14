@@ -20,14 +20,25 @@ export interface HealthResponse {
   phase: number
   uptime_seconds: number
   master_seed: number
+  /** Minutes after the fraud by which money has typically left the system.
+   *  The console's SLA meter counts down against this rather than hardcoding
+   *  90, so the two cannot drift apart. */
+  golden_hour_minutes: number
   artifacts: ArtifactStatus
 }
 
 export interface Scenario {
   scenario_id: string
+  /** `CFMC/2026/08/S1-8644`. Derived with hashlib server-side, so the console,
+   *  the freeze order and the audit trail all quote the same string. */
+  case_id: string
+  /** `NCRP/2026/08/5860904`. The citizen's complaint acknowledgement. */
+  complaint_ref: string
   name: string
   summary: string
   victim_account: string
+  /** The bank that took the complaint. */
+  victim_bank: string
   victim_district: string
   victim_archetype: string
   amount_inr: number
@@ -178,6 +189,8 @@ export interface InterdictResponse {
   policy_label: string
   budget_k: number
   innocence_budget: number
+  /** What this result was scored against, echoed back by the server. */
+  adaptive_adversary: boolean
   plan: PlanStep[]
   projected_recovery_inr: number
   projected_leak_inr: number
@@ -193,6 +206,114 @@ export interface InterdictResponse {
   candidates_considered: number
   rollouts: number
   particles: number
+}
+
+// ------------------------------------------------------------ freeze orders
+
+export interface OrderRow {
+  rank: number
+  /** Masked: a real order would never circulate full identifiers. */
+  account_ref: string
+  action: FreezeAction
+  instruction: string
+  issue_at_minute: number
+  expected_recovery_inr: number
+  amount_at_risk_inr: number
+  p_mule: number
+  innocence_cost: number
+  reason_codes: string[]
+  /** The system's own judgement that this one is too shaky for one officer. */
+  requires_second_approval: boolean
+}
+
+export interface BankOrder {
+  bank_id: string
+  bank_name: string
+  order_id: string
+  instructions: number
+  amount_at_risk_inr: number
+  expected_recovery_inr: number
+  requires_second_approval: number
+  rows: OrderRow[]
+}
+
+export interface FreezeOrder {
+  scenario_id: string
+  case_id: string
+  complaint_ref: string
+  order_id: string
+  issued_at: string
+  issuing_authority: string
+  issuing_desk: string
+  issued_by: string
+  classification: string
+  disclaimer: string
+  amount_inr: number
+  reporting_bank: string
+  victim_district: string
+  complaint_delay_minutes: number
+  policy: PolicyId
+  policy_label: string
+  budget_k: number
+  innocence_budget: number
+  adaptive_adversary: boolean
+  total_instructions: number
+  total_requires_second_approval: number
+  banks: BankOrder[]
+}
+
+export interface OrderParams {
+  scenarioId: string
+  policy: PolicyId
+  budgetK: number
+  innocenceBudget: number
+  adaptiveAdversary: boolean
+}
+
+function orderQuery(params: OrderParams): string {
+  return new URLSearchParams({
+    policy: params.policy,
+    budget_k: String(params.budgetK),
+    innocence_budget: String(params.innocenceBudget),
+    adaptive_adversary: String(params.adaptiveAdversary),
+  }).toString()
+}
+
+/** Where the browser should go to download the PDF. */
+export function freezeOrderPdfUrl(
+  params: OrderParams,
+  bankId?: string,
+): string {
+  const query = orderQuery(params) + (bankId ? `&bank_id=${bankId}` : '')
+  return `/api/freeze-order/${params.scenarioId}.pdf?${query}`
+}
+
+export interface IntakeRequest {
+  victim_account: string
+  amount_inr: number
+  incident_time: string
+  complaint_delay_minutes: number
+  channel: string
+}
+
+export interface IntakeResponse {
+  incident_id: string
+  /** Derived the same way as a seeded case, so a filed complaint carries a
+   *  real case number and can be issued as a freeze order like any other. */
+  case_id: string
+  complaint_ref: string
+  victim_account: string
+  victim_bank: string
+  victim_district: string
+  amount_inr: number
+  incident_time: string
+  complaint_time: string
+  complaint_delay_minutes: number
+  channel: string
+  accounts_traced: number
+  candidates_considered: number
+  tainted_still_inside_inr: number
+  tainted_already_gone_inr: number
 }
 
 export interface Attribution {
@@ -253,6 +374,10 @@ export interface DiscoveredRing {
   total_flow_inr: number
   cashout_capacity_inr: number
   mean_p_mule: number
+  /** Spread of member scores. The mean saturates at 1.00 on this data. */
+  p_mule_min: number
+  p_mule_median: number
+  p_mule_histogram: number[]
   confidence: number
   dormancy_days_median: number
   members: string[]
@@ -440,18 +565,31 @@ export const api = {
     ),
   benchmark: () => get<Benchmark>('/api/evaluate'),
   detector: () => get<DetectorReport>('/api/detector'),
+  intake: (request: IntakeRequest) =>
+    post<IntakeResponse>('/api/intake', request),
+  freezeOrder: (params: OrderParams) =>
+    get<FreezeOrder>(`/api/freeze-order/${params.scenarioId}?${orderQuery(params)}`),
 }
 
 /** Absolute ws:// URL for the replay stream, honouring the Vite dev proxy. */
 export function replayUrl(
   scenarioId: string,
-  params: { policy: PolicyId; budgetK: number; innocenceBudget: number; fps: number },
+  params: {
+    policy: PolicyId
+    budgetK: number
+    innocenceBudget: number
+    /** Must match the flag sent to /api/interdict, or the plan and the
+     *  animation of that plan would be scored against different adversaries. */
+    adaptiveAdversary: boolean
+    fps: number
+  },
 ): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const query = new URLSearchParams({
     policy: params.policy,
     budget_k: String(params.budgetK),
     innocence_budget: String(params.innocenceBudget),
+    adaptive_adversary: String(params.adaptiveAdversary),
     fps: String(params.fps),
   })
   return `${protocol}//${window.location.host}/ws/replay/${scenarioId}?${query}`

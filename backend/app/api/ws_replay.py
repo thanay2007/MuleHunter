@@ -40,6 +40,7 @@ async def replay_stream(
     innocence_budget: float = Query(
         default=settings.default_innocence_budget, ge=0.0, le=50.0
     ),
+    adaptive_adversary: bool = Query(default=False),
     fps: int = Query(default=settings.replay_fps, ge=1, le=60),
 ) -> None:
     await websocket.accept()
@@ -70,16 +71,23 @@ async def replay_stream(
     plan = plan_for(policy, context, budget_k, innocence_budget)
     baseline_plan = plan_for("named_account_only", context, budget_k, innocence_budget)
 
+    # The adversary setting has to reach the replay, not just the planner. This
+    # stream drives the "where the money ended up" panel, so if the checkbox
+    # only changed `POST /api/interdict` it would move a number on one screen
+    # and leave the animation next to it telling a different story. Matches
+    # `interdict.py`, deliberately: same setting, same rate, both timelines.
+    reroute = settings.adversary_reroute_prob if adaptive_adversary else 0.0
+
     # Both timelines are computed up front. The stream is then a pure playback,
     # which is what makes the demo identical every run -- and what lets the
     # client scrub backwards without recomputing anything.
     treated = replay(
         context.state, plan, horizon, mules, session.index(),
-        reroute_prob=0.0, collect_frames=True,
+        reroute_prob=reroute, collect_frames=True,
     )
     baseline = replay(
         context.state, baseline_plan, horizon, mules, session.index(),
-        reroute_prob=0.0, collect_frames=True,
+        reroute_prob=reroute, collect_frames=True,
     )
 
     await websocket.send_json(
