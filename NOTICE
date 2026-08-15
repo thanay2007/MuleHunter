@@ -1,0 +1,91 @@
+NOTICE
+======
+
+This repository benchmarks its own mule-account detection model against three
+third-party projects. Those projects are the work of their own authors and are
+not part of this project. This file records who they are and how they are used.
+
+Nothing from any third-party project is vendored, copied or redistributed here.
+The benchmark harness reads each project in place, runs it through its own
+public entrypoints, and reports the results. What travels with this repository
+is our description of each system (bench/MODELS.md), our adapters, and the
+numbers they produced.
+
+
+Third-party projects benchmarked
+--------------------------------
+
+1. ARGUS-PRISM  ("WarmthScore")
+   Path in this checkout: ARGUS-PRISM-main/
+   Licence: NONE FOUND. No LICENSE, COPYING or NOTICE file is present in the
+     repository as obtained.
+   Used for: its WarmthScore feature extractor, its six signal functions, its
+     XGBoost training script and its published hyperparameters.
+
+2. MULE_HUNTER  (the repository brands itself "alertixAI" in its README)
+   Path in this checkout: MULE_HUNTER-main/
+   Licence: NONE FOUND.
+   Used for: its graph feature engineering, its SAGE->GAT network definition,
+     its training script and its published hyperparameters.
+
+3. Mule Account Detection POC
+   Path in this checkout: mule-account-detection-poc-main/
+   Licence: NONE FOUND.
+   Used for: its seven-feature Isolation Forest pipeline and its risk-score
+     ranking formula.
+
+
+On the absence of licences
+--------------------------
+
+None of the three carries an explicit licence. In the absence of a grant,
+default copyright applies. The position taken here is deliberately conservative:
+
+  * No third-party source, weights or data are copied into this repository or
+    into any artifact it publishes. The competitor folders are inputs on disk,
+    not dependencies.
+  * Each project is named as its authors named it, and described factually.
+    Naming a system in order to report a measurement of it is ordinary
+    comparative reference, not redistribution.
+  * Every claim made about a third-party system in bench/MODELS.md and in the
+    generated reports is traceable to a file and a line in that project, so an
+    author reading it can check it.
+  * The harness's blind mode (`make bench BLIND=1`) renders the entire
+    comparison as "System A" through "System D" and produces numerically
+    identical results. If an author asks not to be named, that switch is the
+    answer and nothing else has to change.
+
+If you are an author of one of these projects and something here is wrong or
+unwelcome, the fix is a correction, not a quiet edit: open an issue and the
+reports will be regenerated.
+
+
+Where these systems are run at a disadvantage, and where they are not
+---------------------------------------------------------------------
+
+Recorded in full in bench/reports/input_parity.md. In summary:
+
+  * All three were retrained on our training split using their own training
+    code and their own published hyperparameters, because their shipped weights
+    were fitted on their own synthetic data and would have scored our accounts
+    badly for reasons that have nothing to do with the quality of their methods.
+  * ARGUS-PRISM's SIM-swap signal has no source in our dataset and is passed as
+    zero throughout. That costs it one of its six signals. It is a capability it
+    has and this benchmark cannot exercise, not a weakness.
+  * MULE_HUNTER's serving layer applies hard score floors by transaction amount.
+    Those floors would have raised its score on precisely the large-amount cases
+    this benchmark is made of. They are a demo artifact rather than part of the
+    model, so they are left out -- a choice made against our own interest.
+  * MULE_HUNTER is a batch model run in streaming mode by rebuilding its graph
+    at every tick, which is more work than the benchmark owed it.
+
+
+Vendored libraries
+------------------
+
+  three.js r185  -- MIT, Copyright 2010-2026 three.js authors.  lib/three.min.js
+  d3-force 3.0.0 and its d3-timer / d3-dispatch / d3-quadtree dependencies
+                 -- ISC, Copyright Mike Bostock.  lib/d3-force.min.js
+
+Both are unmodified upstream builds with a loader wrapper; see the header of
+each file.

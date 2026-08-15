@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mulehunter.local/schema/arena-case-1.0.json",
+  "title": "MuleHunter Arena case file",
+  "description": "One replayable fraud case. The Arena is a replay engine: every score, decision and timestamp in this file was produced offline by tools/export_case.py running the four detection systems against the backend dataset. The visualisation never computes a detection result.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "case_id",
+    "title",
+    "scenario_type",
+    "difficulty",
+    "data_provenance",
+    "t0",
+    "victim",
+    "accounts",
+    "transfers",
+    "cashout_events",
+    "models",
+    "recovery_model"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "case_id": { "type": "string", "pattern": "^case_[0-9]{3}$" },
+    "title": { "type": "string", "minLength": 4 },
+
+    "scenario_type": {
+      "enum": [
+        "layering",
+        "smurfing",
+        "rapid_cashout",
+        "dormant_reactivation",
+        "cross_bank_mixing",
+        "mixed"
+      ]
+    },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+
+    "data_provenance": {
+      "enum": ["holdout", "synthetic"],
+      "description": "holdout = drawn from a laundering ring held out of detector training entirely (settings.holdout_ring_ids). synthetic = drawn from a ring the detector trained on. All data in this project is synthetic; this field records whether the case is a fair test or a seen one, and the Arena shows the badge on screen at all times."
+    },
+
+    "t0": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The moment the victim's money left. Every t_offset_sec / t_decision_sec in this file is seconds after t0."
+    },
+    "horizon_sec": {
+      "type": "integer",
+      "description": "How far past t0 the replay runs. Money still inside the banking system at the horizon is treated as recoverable."
+    },
+    "complaint_offset_sec": {
+      "type": "integer",
+      "description": "Seconds after t0 at which the victim reported. No model may act before this."
+    },
+
+    "provenance": {
+      "type": "object",
+      "description": "Where this case came from in the backend pipeline, so a judge can regenerate it.",
+      "properties": {
+        "episode_id": { "type": "string" },
+        "ring_id": { "type": "string" },
+        "typology": { "type": "string" },
+        "generator_seed": { "type": "integer" },
+        "exported_by": { "type": "string" },
+        "exporter_version": { "type": "string" }
+      }
+    },
+
+    "victim": {
+      "type": "object",
+      "required": ["account_id", "display_id", "amount_inr", "channel"],
+      "properties": {
+        "account_id": { "type": "string" },
+        "display_id": { "type": "string" },
+        "amount_inr": { "type": "number", "exclusiveMinimum": 0 },
+        "channel": { "type": "string" }
+      }
+    },
+
+    "accounts": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_id",
+          "bank",
+          "layer",
+          "balance_before_inr",
+          "opened_at",
+          "kyc_level",
+          "ground_truth",
+          "features"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "display_id": { "type": "string" },
+          "bank": { "type": "string" },
+          "layer": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 = victim, 1..N = hops from the victim along the path the money actually took. Accounts pulled in as one-hop context that the money never reached carry the layer of the account that pulled them in."
+          },
+          "balance_before_inr": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The account holder's OWN money, before the stolen funds arrived. Derived from the account's net position over the simulation window, clamped to [500, 2000000]. Freezing the account locks this as well as any stolen money sitting in it, which is what wrongly_frozen prices."
+          },
+          "opened_at": { "type": "string", "format": "date" },
+          "kyc_level": { "enum": ["full", "min", "video", "none"] },
+          "ground_truth": {
+            "enum": ["mule", "innocent"],
+            "description": "Generator label. The Arena strips this from the payload it hands the renderer and holds it in a closure until the Act 4 transition."
+          },
+          "pos": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": { "type": "number" },
+            "description": "Settled 3D layout position. Precomputed offline so the layout is byte-identical between runs."
+          },
+          "pos2": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number" },
+            "description": "Settled 2D layered-DAG position, used by the 2D money view."
+          },
+          "features": {
+            "type": "object",
+            "required": [
+              "pass_through_ratio",
+              "median_hold_seconds",
+              "dormancy_days_before",
+              "inbound_fanin",
+              "outbound_fanout",
+              "device_shared_count",
+              "ip_shared_count",
+              "structuring_score",
+              "cross_bank_hops",
+              "account_age_days",
+              "kyc_mismatch",
+              "beneficiary_added_minutes_before"
+            ],
+            "properties": {
+              "pass_through_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+              "median_hold_seconds": { "type": "number", "minimum": 0 },
+              "dormancy_days_before": { "type": "number", "minimum": 0 },
+              "inbound_fanin": { "type": "integer", "minimum": 0 },
+              "outbound_fanout": { "type": "integer", "minimum": 0 },
+              "device_shared_count": { "type": "integer", "minimum": 0 },
+              "ip_shared_count": { "type": "integer", "minimum": 0 },
+              "structuring_score": { "type": "number", "minimum": 0, "maximum": 1 },
+              "cross_bank_hops": { "type": "integer", "minimum": 0 },
+              "account_age_days": { "type": "number", "minimum": 0 },
+              "kyc_mismatch": { "type": "boolean" },
+              "beneficiary_added_minutes_before": {
+                "type": "number",
+                "minimum": 0,
+                "description": "How long the sender had been paying this account before the stolen money arrived. 0 means the beneficiary was added for this transfer."
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "transfers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to", "amount_inr", "t_offset_sec", "channel", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "amount_inr": {
+            "type": "number",
+            "description": "Stolen rupees moving on this edge, traced pro-rata. Not the face value of the transfer, which is in gross_inr."
+          },
+          "gross_inr": { "type": "number" },
+          "t_offset_sec": { "type": "integer", "minimum": 0 },
+          "channel": { "enum": ["UPI", "IMPS", "NEFT", "CARD", "ATM_WITHDRAWAL"] },
+          "status": { "enum": ["settled", "blocked"] }
+        }
+      }
+    },
+
+    "cashout_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["account_id", "amount_inr", "t_offset_sec", "type"],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "The in-network account that sent the money out. The exit node itself is not an account anyone can freeze and is not in accounts[]."
+          },
+          "amount_inr": { "type": "number" },
+          "t_offset_sec": { "type": "integer", "minimum": 0 },
+          "type": { "enum": ["atm", "crypto", "merchant", "forex"] }
+        }
+      }
+    },
+
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "family", "one_liner", "operating_point", "decisions"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "family": { "enum": ["ours", "baseline"] },
+          "one_liner": { "type": "string" },
+          "method_note": {
+            "type": "string",
+            "description": "Exactly what was run. Where a competing system could not be executed as shipped, this says which part is their published method and which part is our substitution. Rendered in the inspector."
+          },
+          "operating_point": {
+            "type": "object",
+            "required": ["mode", "budget", "threshold", "calibration_note"],
+            "properties": {
+              "mode": { "enum": ["equal_alert_budget", "equal_fpr", "native"] },
+              "budget": { "type": "integer", "minimum": 0 },
+              "threshold": { "type": "number" },
+              "calibration_note": { "type": "string" }
+            }
+          },
+          "operating_points": {
+            "type": "object",
+            "description": "Every mode, precomputed offline. The Arena switches between them by re-reading a stored budget/threshold; it never recomputes a score.",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["mode", "budget", "threshold", "calibration_note"]
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "description": "One entry per account this model scored, in rank order. decision reflects the default operating point.",
+            "items": {
+              "type": "object",
+              "required": ["account_id", "score", "decision", "t_decision_sec", "top_signals"],
+              "properties": {
+                "account_id": { "type": "string" },
+                "score": { "type": "number", "minimum": 0, "maximum": 1 },
+                "rank": { "type": "integer", "minimum": 1 },
+                "decision": { "enum": ["flag", "clear"] },
+                "t_decision_sec": {
+                  "type": "integer",
+                  "description": "Sim-seconds after t0 when the instruction for this account would reach the holding bank: complaint time plus the dispatch latency for its position in the model's own alert queue. The dispatch model is identical for all four systems."
+                },
+                "top_signals": {
+                  "type": "array",
+                  "maxItems": 5,
+                  "items": {
+                    "type": "object",
+                    "required": ["feature", "contribution", "direction", "human_text"],
+                    "properties": {
+                      "feature": { "type": "string" },
+                      "contribution": { "type": "number" },
+                      "direction": { "enum": ["up", "down"] },
+                      "human_text": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "recovery_model": {
+      "type": "object",
+      "required": ["type", "description", "settlement_lag_sec"],
+      "properties": {
+        "type": { "const": "linear_drain" },
+        "description": { "type": "string" },
+        "settlement_lag_sec": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "weakness_note": {
+      "type": "string",
+      "description": "Act 6. Where our system ranks below a baseline on this case or this scenario type, and why. Written by the exporter from the measured result, not by hand."
+    }
+  }
+}

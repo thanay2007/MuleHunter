@@ -1,0 +1,326 @@
+/* ═══════════════════════════════════════════════════════════════
+   canon.css — component canon styling (Part 9).
+   ═══════════════════════════════════════════════════════════════ */
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.mx { font-family: var(--font-machine); font-variant-numeric: tabular-nums slashed-zero; }
+
+/* ── THE SEAL (9.2) ────────────────────────────────────────────── */
+.seal {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-1);
+  border-radius: var(--radius);
+  color: var(--ink);
+  user-select: none; touch-action: none;
+}
+.seal--ink { color: var(--ink); }
+.seal--vermilion { color: var(--vermilion); }
+.seal--reserve { color: var(--reserve); }
+.seal__ring { display: inline-flex; }
+.seal__label {
+  font-size: var(--text-11); font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.seal:hover:not(:disabled) .seal__ring { opacity: 0.85; }
+.seal__ring { position: relative; transition: transform var(--dur-hover) var(--press-out); }
+.seal:hover:not(:disabled) .seal__ring { transform: scale(1.03); }
+.seal--struck .seal__ring { animation: m2-strike var(--dur-strike-settle) var(--press-settle); }
+/* M2 ink-spread — a ring of ink radiates outward on the strike */
+.seal--struck .seal__ring::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: seal-spread var(--dur-strike-settle) var(--press-out);
+}
+@keyframes seal-spread {
+  0%   { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .seal--struck .seal__ring::after { display: none; } }
+.seal--busy .seal__ring svg circle:first-child { animation: seal-rotate 1.6s linear infinite; transform-origin: center; }
+@keyframes seal-rotate { to { transform: rotate(360deg); } }
+.seal:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── THE OVERPRINT (9.3) ───────────────────────────────────────── */
+.overprint {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-text);
+  font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase;
+  border: 2px double currentColor;
+  padding: 1px 5px; border-radius: 1px;
+  transform: rotate(var(--stamp-tilt, 0deg));
+  white-space: nowrap;
+}
+.overprint--ink { color: var(--ink-mut); }
+.overprint--vermilion { color: var(--vermilion); }
+.overprint--verified { color: var(--verified); }
+.overprint--micro { font-size: 9px; padding: 0 3px; border-width: 1px; }
+.overprint--body { font-size: var(--text-11); }
+.overprint--full { font-size: var(--text-20); opacity: 0.24; padding: 4px 12px; }
+.overprint--land { animation: m9-land var(--dur-strike-settle) var(--press-settle); }
+
+/* ── SEVERITY MARKS (5.3) ──────────────────────────────────────── */
+.sevmark { display: inline-flex; }
+.sevmark--clean { color: var(--ink-faint); }
+.sevmark--warming { color: var(--ink); }
+.sevmark--hot { color: var(--reserve); }
+.sevmark--critical, .sevmark--imminent { color: var(--vermilion); }
+
+/* ── THE SLIP (9.1) — the examination row, 44px ────────────────── */
+.slip {
+  display: grid;
+  grid-template-columns: 12px 34px 116px 18px 1fr auto auto 84px;
+  align-items: center; gap: var(--s-3);
+  height: var(--slip-h); padding: 0 var(--s-3) 0 0;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background var(--dur-hover) var(--press-out);
+}
+.slip:hover { background: var(--paper-sunken); }
+.slip--feed { animation: m1-feed var(--dur-feed) var(--press-out); }
+/* Staggered entrance when the tray first prints (cap 12, 28ms step) */
+.tray--entrance .slip {
+  animation: m1-feed var(--dur-feed) var(--press-out) both;
+  animation-delay: calc(var(--slip-order, 0) * 28ms);
+}
+@media (prefers-reduced-motion: reduce) { .tray--entrance .slip { animation: none; } }
+.slip__sev {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  border-left: 3px solid transparent;
+  transition: border-color var(--dur-hover) var(--press-out);
+}
+.slip--critical { background: var(--vermilion-wash); }
+.slip--critical .slip__sev { border-left-color: var(--vermilion); }
+.slip--selected { background: var(--reserve-wash); box-shadow: inset 3px 0 0 var(--ink); }
+.slip--selected .slip__sev { border-left-color: var(--ink); border-left-width: 3px; }
+.slip { transition: background var(--dur-hover) var(--press-out), box-shadow var(--dur-hover) var(--press-out); }
+.slip--examined { opacity: 0.85; }
+.slip--examined .slip__docket { text-decoration: line-through; }
+.slip__docket { font-family: var(--font-machine); font-size: var(--text-12); color: var(--ink-mut); }
+.slip__ref { font-family: var(--font-machine); font-size: var(--text-13); }
+.slip__summary {
+  font-size: var(--text-13); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.slip__signals { font-family: var(--font-machine); font-size: var(--text-11); color: var(--ink-mut); }
+.slip__amount { font-family: var(--font-machine); font-size: var(--text-13); font-weight: 600; text-align: right; }
+.slip__sla { font-family: var(--font-machine); font-size: var(--text-11); text-align: right; color: var(--ink-mut); }
+.slip__sla--overdue { color: var(--vermilion); font-weight: 600; }
+
+/* ── PRESS-NOTICE (9.8) ────────────────────────────────────────── */
+.notice-dock {
+  position: fixed; left: var(--s-6); bottom: var(--s-6);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  z-index: 60; max-width: 360px;
+}
+.notice {
+  background: var(--paper-raised); border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card); padding: var(--s-3) var(--s-4);
+  animation: m1-feed var(--dur-feed) var(--press-out);
+  /* deckle top edge */
+  clip-path: polygon(0 3px, 3% 0, 8% 3px, 14% 0, 20% 3px, 27% 0, 34% 3px, 41% 0, 48% 3px, 55% 0, 62% 3px, 69% 0, 76% 3px, 83% 0, 90% 3px, 96% 0, 100% 3px, 100% 100%, 0 100%);
+}
+.notice--leaving { animation: notice-out var(--dur-feed) var(--press-out) forwards; }
+@keyframes notice-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-12px); } }
+@media (prefers-reduced-motion: reduce) { .notice--leaving { animation: none; opacity: 0; } }
+.notice__dateline { font-family: var(--font-machine); font-size: var(--text-11); color: var(--ink-faint); }
+.notice__msg { font-size: var(--text-13); margin-top: 2px; }
+.notice--error { border-color: var(--vermilion); }
+
+/* ── THE DRAWER (9.7) — plane 2 ────────────────────────────────── */
+.drawer-scrim {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(var(--ink-rgb), 0.25);
+  display: flex; justify-content: flex-end;
+  animation: scrim-in var(--dur-feed) var(--press-out);
+}
+.drawer-scrim--closing { animation: scrim-out var(--dur-feed) var(--press-out) forwards; }
+@keyframes scrim-in { from { background: rgba(var(--ink-rgb), 0); } to { background: rgba(var(--ink-rgb), 0.25); } }
+@keyframes scrim-out { from { background: rgba(var(--ink-rgb), 0.25); } to { background: rgba(var(--ink-rgb), 0); } }
+.drawer {
+  width: var(--drawer-w); max-width: 92vw; height: 100%;
+  background: var(--paper-raised); border-left: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card); overflow-y: auto;
+  animation: m14-slide var(--dur-feed) var(--press-out);
+}
+.drawer--closing { animation: m14-slide-out var(--dur-feed) var(--press-out) forwards; }
+@keyframes m14-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes m14-slide-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .drawer-scrim, .drawer-scrim--closing, .drawer, .drawer--closing { animation: none; }
+}
+.drawer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); padding: var(--s-6) var(--s-6) var(--s-4); border-bottom: 1px solid var(--rule); }
+.drawer__ref { font-size: var(--text-11); color: var(--ink-faint); }
+.drawer__close { font-size: var(--text-16); color: var(--ink-mut); padding: var(--s-1); }
+.drawer__body { padding: var(--s-6); }
+
+/* ── THE INDEX (9.9) — command palette ─────────────────────────── */
+.index-scrim {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(var(--ink-rgb), 0.25);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: 12vh;
+}
+.index-tray {
+  width: 560px; max-width: 92vw;
+  background: var(--paper-raised); border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card);
+  animation: m1-feed var(--dur-feed) var(--press-out);
+}
+.index-input {
+  width: 100%; padding: var(--s-4) var(--s-6);
+  font-size: var(--text-20); font-family: var(--font-display);
+  background: transparent; border: none; border-bottom: 1px solid var(--rule-strong);
+}
+.index-input:focus { outline: none; }
+.index-results { max-height: 50vh; overflow-y: auto; padding: var(--s-2); }
+.index-group { padding: var(--s-3) var(--s-4) var(--s-1); }
+.index-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4);
+  width: 100%; text-align: left; padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius);
+}
+.index-row--active { background: var(--reserve-wash); }
+.index-row__label { font-size: var(--text-14); }
+.index-row__hint { font-size: var(--text-12); color: var(--ink-mut); }
+.index-empty { padding: var(--s-6); color: var(--ink-faint); text-align: center; }
+
+/* ── WATERMARK IDLE (M11) ──────────────────────────────────────── */
+.watermark-layer {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); opacity: 0.08;
+  animation: watermark-in 3s var(--press-out) both;
+}
+.watermark-layer--breathe { animation: watermark-in 3s var(--press-out) both, m11-breathe 8s 3s infinite; }
+@keyframes watermark-in { from { opacity: 0; } to { opacity: 0.08; } }
+
+/* ── THE KEYBOARD SHEET (Appendix B) ───────────────────────────── */
+.help-scrim { position: fixed; inset: 0; z-index: 75; background: rgba(var(--ink-rgb), 0.25); display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+.help-sheet { background: var(--paper-raised); border: 1px solid var(--rule-strong); box-shadow: var(--shadow-card); padding: var(--s-8); width: 480px; max-width: 92vw; animation: m1-feed var(--dur-feed) var(--press-out); }
+.help-map { margin-top: var(--s-4); display: flex; flex-direction: column; }
+.help-row { display: grid; grid-template-columns: 140px 1fr; gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--rule); }
+.help-row dt { font-size: var(--text-12); color: var(--ink-mut); }
+.help-row dd { font-size: var(--text-13); }
+
+/* ── HATCH CHART (9.5) ─────────────────────────────────────────── */
+.hatch-fig { margin: 0; }
+.hatch-svg { width: 100%; height: auto; display: block; }
+.hatch-band { font-family: var(--font-machine); font-size: 8px; fill: var(--ink-faint); }
+.hatch-line { stroke-dasharray: 1; animation: rosette-scribe 900ms var(--press-out) both; }
+.hatch-area { animation: hatch-fade 900ms var(--press-out) both; }
+@keyframes hatch-fade { from { opacity: 0; } to { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .hatch-line, .hatch-area { animation: none; } }
+.hatch-caption { font-family: var(--font-machine); font-size: var(--text-11); color: var(--ink-mut); margin-top: var(--s-2); letter-spacing: 0.04em; }
+
+/* ── THE REPLAY (9.13) ─────────────────────────────────────────── */
+.replay { margin-top: var(--s-4); }
+.replay__track { position: relative; height: 24px; }
+.replay__density { position: absolute; inset: 0 0 12px 0; }
+.replay__tick { position: absolute; top: 0; width: 1px; height: 10px; }
+.replay__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; cursor: pointer; display: flex; align-items: center; }
+.replay__bar::before { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--rule-strong); }
+.replay__thumb { position: absolute; width: 3px; height: 12px; background: var(--ink); transform: translateX(-50%); transition: left 120ms var(--press-out); }
+.replay__bar:focus-visible { outline: 2px solid var(--reserve); outline-offset: 3px; }
+.replay__foot { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); }
+.replay__date { font-size: var(--text-11); color: var(--ink-faint); }
+.replay__now { flex: 1; text-align: center; font-size: var(--text-11); color: var(--ink-mut); }
+.replay__now--live { color: var(--verified); font-weight: 600; }
+.replay__live-chip { display: inline-flex; align-items: center; gap: var(--s-1); font-size: var(--text-11); font-weight: 700; letter-spacing: 0.06em; padding: 2px var(--s-2); border: 1px solid var(--rule-strong); border-radius: var(--radius); color: var(--ink-mut); }
+.replay__live-chip--on { color: var(--verified); border-color: var(--verified); }
+.cert-head--replaying { outline: 1px dashed var(--reserve); outline-offset: 2px; }
+
+/* ── THE REDACTION BAR (9.17) ──────────────────────────────────── */
+.redaction { display: inline-flex; align-items: center; gap: var(--s-2); }
+.redaction__bar { color: var(--ink); letter-spacing: -1px; font-family: var(--font-machine); user-select: none; }
+.redaction--open { color: var(--ink); }
+
+/* ── THE ROUTING SLIP (9.14) ───────────────────────────────────── */
+.deckle { clip-path: polygon(0 4px, 4% 0, 9% 4px, 15% 0, 22% 4px, 30% 0, 38% 4px, 46% 0, 54% 4px, 62% 0, 70% 4px, 78% 0, 86% 4px, 93% 0, 100% 4px, 100% 100%, 0 100%); }
+.routing { display: flex; flex-direction: column; gap: var(--s-6); padding-top: var(--s-2); }
+.routing__block > .v-label { display: block; margin-bottom: var(--s-2); }
+.routing__req { color: var(--vermilion); margin-left: var(--s-2); }
+.routing__basis { width: 100%; border: 1px solid var(--rule-strong); border-radius: var(--radius); padding: var(--s-3); resize: vertical; }
+.routing__count { font-size: var(--text-11); color: var(--vermilion); margin-top: var(--s-1); }
+.routing__count--ok { color: var(--verified); }
+.routing__actions { display: flex; gap: var(--s-2); }
+.routing__sign { border-top: 1px solid var(--rule-strong); padding-top: var(--s-4); display: flex; flex-direction: column; gap: var(--s-4); align-items: flex-start; }
+.routing__signline { font-size: var(--text-11); color: var(--ink-mut); }
+
+/* ── THE COMPARATOR (9.12) ─────────────────────────────────────── */
+.comparator { display: flex; flex-direction: column; gap: var(--s-6); }
+.comparator__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.comparator__fig { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); padding: var(--s-4); border: 1px solid var(--rule); }
+.comparator__cohort { font-size: var(--text-11); color: var(--ink-mut); text-align: center; }
+.comparator__ledger { display: flex; flex-direction: column; }
+.comparator__row { display: grid; grid-template-columns: 1fr 70px 70px 100px; gap: var(--s-2); align-items: center; padding: var(--s-2) 0; border-bottom: 1px solid var(--rule); font-size: var(--text-13); }
+.comparator__row--head { color: var(--ink-mut); font-size: var(--text-11); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.comparator__r { text-align: right; }
+.comparator__dev { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-2); }
+.comparator__hatch { height: 8px; background: repeating-linear-gradient(45deg, var(--intaglio) 0 1px, transparent 1px 3px); }
+.comparator__none { font-size: var(--text-12); color: var(--ink-faint); padding: var(--s-4) 0; }
+
+/* ── THE EXAMINER (Sheet 12 / 9.22) ────────────────────────────── */
+.loupe-btn {
+  position: fixed; right: var(--s-6); bottom: var(--s-6); z-index: 55;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--paper-raised); border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card); color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--dur-hover) var(--press-out);
+}
+.loupe-btn:hover { background: var(--paper-sunken); }
+.loupe-btn--off { color: var(--ink-faint); }
+.loupe-btn--off svg { transform: rotate(45deg); }
+
+.examiner {
+  position: fixed; right: var(--s-6); bottom: 92px; z-index: 55;
+  width: 400px; max-width: 92vw; max-height: 70vh;
+  display: flex; flex-direction: column;
+  background: var(--paper-raised); border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card);
+  animation: m1-feed var(--dur-feed) var(--press-out);
+}
+.examiner__head { display: flex; align-items: center; justify-content: space-between; padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--rule); }
+.examiner__transcript { flex: 1; overflow-y: auto; padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.examiner__greeting { font-size: var(--text-13); color: var(--ink-mut); font-style: italic; }
+.examiner__offline { font-size: var(--text-13); color: var(--ink-faint); text-align: center; padding: var(--s-4); }
+.turn { max-width: 90%; }
+.turn--operator { align-self: flex-end; border-right: 2px solid var(--reserve); padding-right: var(--s-3); }
+.turn--examiner { align-self: flex-start; border-left: 2px solid var(--rule-strong); padding-left: var(--s-3); }
+.turn__text { font-size: var(--text-13); white-space: pre-wrap; }
+.examiner__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); padding: 0 var(--s-4) var(--s-3); }
+.req-slip { font-size: var(--text-11); padding: var(--s-1) var(--s-3); border: 1px solid var(--rule-strong); border-radius: var(--radius); color: var(--ink-mut); text-align: left; }
+.req-slip:hover { background: var(--paper-sunken); color: var(--ink); }
+.examiner__composer { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--rule); }
+.examiner__composer .field__input { width: 100%; }
+
+/* ── PROFILE & SESSIONS (Sheet 11) ─────────────────────────────── */
+.profile { display: flex; flex-direction: column; gap: var(--s-8); }
+.profile__cred { display: flex; flex-direction: column; gap: var(--s-1); padding-bottom: var(--s-4); border-bottom: 1px solid var(--rule); }
+.profile__email { font-size: var(--text-13); }
+.profile__mfa { font-size: var(--text-12); color: var(--ink-mut); }
+.profile__block > .v-label { display: block; margin-bottom: var(--s-3); }
+.profile__lever { max-width: 220px; }
+.session-list { list-style: none; display: flex; flex-direction: column; gap: var(--s-3); }
+.session { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); padding: var(--s-3); border: 1px solid var(--rule); border-radius: var(--radius); }
+.session__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.session__device { font-size: var(--text-13); }
+.session__ip { font-size: var(--text-11); color: var(--ink-mut); }
+.session__seen { font-size: var(--text-11); color: var(--ink-faint); }
+
+/* ── WORKSHEET (9.4) ───────────────────────────────────────────── */
+.worksheet { border-top: 1px solid var(--rule); padding-top: var(--s-4); }
+.worksheet__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-6); }
+.worksheet__col h4 {
+  font-size: var(--text-11); font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-mut); margin-bottom: var(--s-2);
+  border-bottom: 1px solid var(--rule); padding-bottom: var(--s-1);
+}
+.worksheet__line { display: grid; grid-template-columns: 28px 1fr 48px; gap: var(--s-2); align-items: center; padding: var(--s-1) 0; }
+.worksheet__code { font-family: var(--font-machine); font-size: var(--text-11); color: var(--ink-mut); }
+.worksheet__finding { font-size: var(--text-13); }
+.worksheet__hatch { height: 8px; background: repeating-linear-gradient(45deg, var(--intaglio) 0 1px, transparent 1px 3px); }
+.worksheet__none { font-size: var(--text-12); color: var(--ink-faint); font-style: italic; }
